@@ -4,17 +4,35 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { CalendarDays, Download, Calendar, TrendingUp, Users, Clock, Search, Building2, ChevronRight, ChevronDown, User as UserIcon, Mail } from "lucide-react";
+import { 
+  CalendarDays, 
+  Download, 
+  Calendar, 
+  TrendingUp, 
+  Users, 
+  Clock, 
+  Search, 
+  Building2, 
+  ChevronRight, 
+  ChevronDown, 
+  User as UserIcon, 
+  Mail,
+  FileSpreadsheet,
+  FileText,
+  FileDown
+} from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query";
 import jsPDF from "jspdf";
+import "jspdf-autotable";
+import * as XLSX from "xlsx";
 import { addCompanyHeader, addWatermark, addHRSignature, addFooter, addDocumentDate, generateReferenceNumber, addReferenceNumber } from "@/lib/pdf-utils";
 import { User, Department, Unit } from "@shared/schema";
 
 export default function LeaveReportPage() {
-  const [selectedMonth, setSelectedMonth] = useState("January 2025");
+  const [selectedMonth, setSelectedMonth] = useState("January 2026");
   const [selectedUnit, setSelectedUnit] = useState("all");
   const [selectedDept, setSelectedDept] = useState("all");
   const [expandedEmployees, setExpandedEmployees] = useState<Set<number>>(new Set());
@@ -34,7 +52,9 @@ export default function LeaveReportPage() {
   };
 
   const getMonthData = (monthYear: string) => {
-    const [monthName, year] = monthYear.split(" ");
+    const parts = monthYear.split(" ");
+    if (parts.length < 2) return { startDate: new Date(), endDate: new Date() };
+    const [monthName, year] = parts;
     const monthIndex = new Date(`${monthName} 1, ${year}`).getMonth();
     const startDate = new Date(parseInt(year), monthIndex, 1);
     const endDate = new Date(parseInt(year), monthIndex + 1, 0);
@@ -70,36 +90,43 @@ export default function LeaveReportPage() {
   };
 
   const leaveStats = [
-    { title: "Total Approved Leaves", value: leaveRequests.filter(r => r.status === 'approved').length.toString(), icon: <CalendarDays className="h-5 w-5" />, color: "bg-teal-50 text-teal-600" },
-    { title: "Pending Requests", value: leaveRequests.filter(r => r.status === 'pending').length.toString(), icon: <Clock className="h-5 w-5" />, color: "bg-yellow-50 text-yellow-600" },
-    { title: "Units", value: units.length.toString(), icon: <Building2 className="h-5 w-5" />, color: "bg-blue-50 text-blue-600" },
-    { title: "Departments", value: departments.length.toString(), icon: <Users className="h-5 w-5" />, color: "bg-green-50 text-green-600" },
+    { title: "Total Approved Leaves", value: leaveRequests.filter(r => r.status === 'approved').length.toString(), icon: <CalendarDays className="h-5 w-5" />, color: "bg-teal-50 text-teal-600 dark:bg-teal-950 dark:text-teal-400" },
+    { title: "Pending Requests", value: leaveRequests.filter(r => r.status === 'pending').length.toString(), icon: <Clock className="h-5 w-5" />, color: "bg-yellow-50 text-yellow-600 dark:bg-yellow-950 dark:text-yellow-400" },
+    { title: "Units", value: units.length.toString(), icon: <Building2 className="h-5 w-5" />, color: "bg-blue-50 text-blue-600 dark:bg-blue-950 dark:text-blue-400" },
+    { title: "Departments", value: departments.length.toString(), icon: <Users className="h-5 w-5" />, color: "bg-green-50 text-green-600 dark:bg-green-950 dark:text-green-400" },
   ];
 
   const handleExportPDF = () => {
     const doc = new jsPDF({ orientation: 'landscape' });
     addWatermark(doc);
-    addCompanyHeader(doc, { title: "UNIT-WISE LEAVE REPORT", subtitle: `Period: ${selectedMonth} | Unit: ${selectedUnit === 'all' ? 'All Units' : units.find(u => u.id === parseInt(selectedUnit))?.name}` });
+    addCompanyHeader(doc, { 
+      title: "UNIT-WISE LEAVE REPORT", 
+      subtitle: `Period: ${selectedMonth} | Unit: ${selectedUnit === 'all' ? 'All Units' : units.find(u => u.id === parseInt(selectedUnit))?.name}` 
+    });
     
     const tableData = employees
       .filter(emp => {
         const dept = departments.find(d => d.id === emp.departmentId);
-        return selectedUnit === 'all' || (dept && dept.unitId === parseInt(selectedUnit));
+        const matchesUnit = selectedUnit === 'all' || (dept && dept.unitId === parseInt(selectedUnit));
+        return matchesUnit;
       })
       .map(emp => {
-        const leaveCount = getEmployeeLeaves(emp.id);
+        const stats = getDetailedLeaveStats(emp.id);
         return [
           emp.employeeId || '-',
           `${emp.firstName} ${emp.lastName}`,
           departments.find(d => d.id === emp.departmentId)?.name || '-',
-          leaveCount.toString()
+          stats.approved.toString(),
+          stats.pending.toString(),
+          stats.remaining.toString()
         ];
       });
 
     (doc as any).autoTable({
-      head: [['Emp ID', 'Name', 'Department', 'Approved Leaves']],
+      head: [['Emp ID', 'Name', 'Department', 'Approved', 'Pending', 'Remaining']],
       body: tableData,
       startY: 70,
+      headStyles: { fillStyle: 'F', fillColor: [15, 23, 42] }
     });
 
     addFooter(doc);
@@ -107,11 +134,53 @@ export default function LeaveReportPage() {
     addReferenceNumber(doc, refNumber, 68);
     addDocumentDate(doc, undefined, 68);
     doc.save(`leave_report_${selectedMonth.replace(/\s+/g, '_')}.pdf`);
-    toast({ title: "PDF Exported" });
+    toast({ title: "PDF Exported Successfully" });
   };
 
-  const handleSendMail = () => {
-    toast({ title: "Email Sent", description: "Leave report has been sent to administrators." });
+  const handleExportExcel = () => {
+    const dataToExport = employees
+      .filter(emp => {
+        const dept = departments.find(d => d.id === emp.departmentId);
+        return selectedUnit === 'all' || (dept && dept.unitId === parseInt(selectedUnit));
+      })
+      .map(emp => {
+        const stats = getDetailedLeaveStats(emp.id);
+        return {
+          'Employee ID': emp.employeeId || '-',
+          'Name': `${emp.firstName} ${emp.lastName}`,
+          'Department': departments.find(d => d.id === emp.departmentId)?.name || '-',
+          'Approved Leaves': stats.approved,
+          'Pending Leaves': stats.pending,
+          'Remaining Balance': stats.remaining
+        };
+      });
+
+    const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Leaves");
+    XLSX.writeFile(workbook, `leave_report_${selectedMonth.replace(/\s+/g, '_')}.xlsx`);
+    toast({ title: "Excel Exported Successfully" });
+  };
+
+  const handleExportText = () => {
+    let textContent = `LEAVE REPORT - ${selectedMonth}\n`;
+    textContent += `Unit: ${selectedUnit === 'all' ? 'All' : selectedUnit}\n`;
+    textContent += "=".repeat(80) + "\n";
+    textContent += `Emp ID\tName\tDepartment\tApproved\tPending\tRemaining\n`;
+    textContent += "-".repeat(80) + "\n";
+
+    employees.forEach(emp => {
+      const stats = getDetailedLeaveStats(emp.id);
+      textContent += `${emp.employeeId || '-'}\t${emp.firstName} ${emp.lastName}\t${departments.find(d => d.id === emp.departmentId)?.name || '-'}\t${stats.approved}\t${stats.pending}\t${stats.remaining}\n`;
+    });
+
+    const blob = new Blob([textContent], { type: "text/plain" });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `leave_report_${selectedMonth.replace(/\s+/g, '_')}.txt`;
+    a.click();
+    toast({ title: "Text File Exported" });
   };
 
   return (
@@ -123,59 +192,34 @@ export default function LeaveReportPage() {
           className="flex flex-col md:flex-row md:items-center md:justify-between gap-4"
         >
           <div>
-            <h1 className="text-2xl font-bold text-slate-900" data-testid="text-page-title">Unit-wise Leave Reports</h1>
+            <h1 className="text-2xl font-bold text-slate-900 dark:text-white" data-testid="text-page-title">Unit-wise Leave Reports</h1>
             <p className="text-slate-500 mt-1">Hierarchical leave analysis: Unit &gt; Department &gt; Employee</p>
           </div>
           <div className="flex gap-2 flex-wrap">
             <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-              <SelectTrigger className="w-40" data-testid="select-month">
+              <SelectTrigger className="w-40 h-9" data-testid="select-month">
                 <Calendar className="h-4 w-4 mr-2" />
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="January 2026">January 2026</SelectItem>
-                <SelectItem value="December 2025">December 2025</SelectItem>
-                <SelectItem value="November 2025">November 2025</SelectItem>
-                <SelectItem value="October 2025">October 2025</SelectItem>
-                <SelectItem value="September 2025">September 2025</SelectItem>
-                <SelectItem value="August 2025">August 2025</SelectItem>
-                <SelectItem value="July 2025">July 2025</SelectItem>
-                <SelectItem value="June 2025">June 2025</SelectItem>
-                <SelectItem value="May 2025">May 2025</SelectItem>
-                <SelectItem value="April 2025">April 2025</SelectItem>
-                <SelectItem value="March 2025">March 2025</SelectItem>
-                <SelectItem value="February 2025">February 2025</SelectItem>
-                <SelectItem value="January 2025">January 2025</SelectItem>
+                <SelectItem value="January 2026">Jan 2026</SelectItem>
+                <SelectItem value="December 2025">Dec 2025</SelectItem>
+                <SelectItem value="Year 2025">Year 2025</SelectItem>
+                <SelectItem value="November 2025">Nov 2025</SelectItem>
+                <SelectItem value="October 2025">Oct 2025</SelectItem>
               </SelectContent>
             </Select>
-            <Select value={selectedUnit} onValueChange={(val) => { setSelectedUnit(val); setSelectedDept("all"); }}>
-              <SelectTrigger className="w-40" data-testid="select-unit">
-                <Building2 className="h-4 w-4 mr-2" />
-                <SelectValue placeholder="Select Unit" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Units</SelectItem>
-                {units.map(u => <SelectItem key={u.id} value={u.id.toString()}>{u.name}</SelectItem>)}
-              </SelectContent>
-            </Select>
-            <Select value={selectedDept} onValueChange={setSelectedDept}>
-              <SelectTrigger className="w-40" data-testid="select-dept">
-                <Users className="h-4 w-4 mr-2" />
-                <SelectValue placeholder="Select Dept" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Departments</SelectItem>
-                {departments.filter(d => selectedUnit === "all" || d.unitId === parseInt(selectedUnit)).map(d => (
-                  <SelectItem key={d.id} value={d.id.toString()}>{d.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Button variant="outline" className="gap-2" onClick={handleExportPDF}>
-              <Download className="h-4 w-4" /> PDF
-            </Button>
-            <Button variant="outline" className="gap-2" onClick={handleSendMail}>
-              <Mail className="h-4 w-4" /> Mail
-            </Button>
+            <div className="flex bg-slate-100 dark:bg-slate-900 rounded-lg p-1 border border-slate-200 dark:border-slate-800">
+              <Button variant="ghost" size="sm" className="h-7 text-xs gap-1 hover-elevate px-2" onClick={handleExportPDF}>
+                <FileDown className="h-3 w-3" /> PDF
+              </Button>
+              <Button variant="ghost" size="sm" className="h-7 text-xs gap-1 hover-elevate px-2" onClick={handleExportExcel}>
+                <FileSpreadsheet className="h-3 w-3" /> Excel
+              </Button>
+              <Button variant="ghost" size="sm" className="h-7 text-xs gap-1 hover-elevate px-2" onClick={handleExportText}>
+                <FileText className="h-3 w-3" /> Text
+              </Button>
+            </div>
           </div>
         </motion.div>
 
@@ -186,7 +230,7 @@ export default function LeaveReportPage() {
                 <div className="flex items-center gap-4">
                   <div className={`p-3 rounded-lg ${stat.color}`}>{stat.icon}</div>
                   <div>
-                    <p className="text-2xl font-bold text-slate-900">{stat.value}</p>
+                    <p className="text-2xl font-bold text-slate-900 dark:text-white">{stat.value}</p>
                     <p className="text-sm text-slate-500">{stat.title}</p>
                   </div>
                 </div>
@@ -220,10 +264,10 @@ export default function LeaveReportPage() {
               
               return (
                 <div key={dept.id} className="border rounded-lg overflow-hidden">
-                  <div className="w-full flex items-center justify-between p-4 bg-slate-50 border-b">
+                  <div className="w-full flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-900 border-b">
                     <div className="flex items-center gap-3">
                       <ChevronDown className="h-4 w-4" />
-                      <span className="font-semibold text-slate-700">{dept.name}</span>
+                      <span className="font-semibold text-slate-700 dark:text-slate-200">{dept.name}</span>
                       <Badge variant="secondary" className="ml-2">
                         {deptEmployees.length} Employees
                       </Badge>
@@ -232,7 +276,7 @@ export default function LeaveReportPage() {
                       </Badge>
                     </div>
                   </div>
-                  <div className="p-2 bg-white divide-y">
+                  <div className="p-2 bg-white dark:bg-slate-950 divide-y">
                     {deptEmployees
                       .filter(e => e.firstName.toLowerCase().includes(searchQuery.toLowerCase()) || e.lastName.toLowerCase().includes(searchQuery.toLowerCase()))
                       .map(emp => {
@@ -243,10 +287,10 @@ export default function LeaveReportPage() {
                           <div key={emp.id} className="flex flex-col">
                             <button
                               onClick={() => toggleEmployee(emp.id)}
-                              className="p-3 flex items-center justify-between hover:bg-slate-50 transition-colors w-full text-left"
+                              className="p-3 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors w-full text-left"
                             >
                               <div className="flex items-center gap-3">
-                                <div className="p-2 rounded-full bg-slate-100">
+                                <div className="p-2 rounded-full bg-slate-100 dark:bg-slate-800">
                                   {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                                 </div>
                                 <div>
@@ -255,8 +299,8 @@ export default function LeaveReportPage() {
                                 </div>
                               </div>
                               <div className="flex gap-2">
-                                <Badge variant="outline" className="text-green-600 bg-green-50">Used: {stats.approved}</Badge>
-                                <Badge variant="outline" className="text-blue-600 bg-blue-50">Remaining: {stats.remaining}</Badge>
+                                <Badge variant="outline" className="text-green-600 bg-green-50 dark:bg-green-950">Used: {stats.approved}</Badge>
+                                <Badge variant="outline" className="text-blue-600 bg-blue-50 dark:bg-blue-950">Remaining: {stats.remaining}</Badge>
                               </div>
                             </button>
                             
@@ -266,22 +310,22 @@ export default function LeaveReportPage() {
                                   initial={{ height: 0, opacity: 0 }}
                                   animate={{ height: "auto", opacity: 1 }}
                                   exit={{ height: 0, opacity: 0 }}
-                                  className="bg-slate-50/50 p-4 border-t"
+                                  className="bg-slate-50/50 dark:bg-slate-900/50 p-4 border-t"
                                 >
                                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-                                    <div className="bg-white p-3 rounded border">
+                                    <div className="bg-white dark:bg-slate-950 p-3 rounded border">
                                       <p className="text-xs text-slate-500 uppercase font-semibold">Accrued</p>
                                       <p className="text-lg font-bold">{stats.accrued}</p>
                                     </div>
-                                    <div className="bg-white p-3 rounded border text-green-600">
+                                    <div className="bg-white dark:bg-slate-950 p-3 rounded border text-green-600">
                                       <p className="text-xs text-slate-500 uppercase font-semibold">Approved</p>
                                       <p className="text-lg font-bold">{stats.approved}</p>
                                     </div>
-                                    <div className="bg-white p-3 rounded border text-yellow-600">
+                                    <div className="bg-white dark:bg-slate-950 p-3 rounded border text-yellow-600">
                                       <p className="text-xs text-slate-500 uppercase font-semibold">Pending</p>
                                       <p className="text-lg font-bold">{stats.pending}</p>
                                     </div>
-                                    <div className="bg-white p-3 rounded border text-red-600">
+                                    <div className="bg-white dark:bg-slate-950 p-3 rounded border text-red-600">
                                       <p className="text-xs text-slate-500 uppercase font-semibold">Rejected</p>
                                       <p className="text-lg font-bold">{stats.rejected}</p>
                                     </div>
