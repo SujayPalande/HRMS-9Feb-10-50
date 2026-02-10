@@ -154,6 +154,8 @@ export default function PfPage() {
                     <th className="text-left py-3 px-4 text-slate-600">Basic Salary</th>
                     <th className="text-left py-3 px-4 text-slate-600">Employee (12%)</th>
                     <th className="text-left py-3 px-4 text-slate-600">Employer (12%)</th>
+                    <th className="text-left py-3 px-4 text-slate-600">EDLI (0.5%)</th>
+                    <th className="text-left py-3 px-4 text-slate-600">Admin (0.5%)</th>
                     <th className="text-left py-3 px-4 text-slate-600">Total</th>
                   </tr>
                 </thead>
@@ -164,6 +166,8 @@ export default function PfPage() {
                       <td className="py-3 px-4">₹{row.basicSalary.toLocaleString()}</td>
                       <td className="py-3 px-4">₹{row.employeeContrib.toLocaleString()}</td>
                       <td className="py-3 px-4">₹{row.employerContrib.toLocaleString()}</td>
+                      <td className="py-3 px-4">₹{row.edliContrib.toLocaleString()}</td>
+                      <td className="py-3 px-4">₹{row.adminCharges.toLocaleString()}</td>
                       <td className="py-3 px-4 font-medium text-teal-600">₹{row.total.toLocaleString()}</td>
                     </tr>
                   ))}
