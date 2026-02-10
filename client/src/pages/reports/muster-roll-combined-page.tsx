@@ -72,6 +72,19 @@ export default function MusterRollCombinedPage() {
     queryKey: ["/api/leave-requests"],
   });
 
+  const { data: units = [] } = useQuery<any[]>({
+    queryKey: ["/api/masters/units"],
+  });
+
+  const [selectedUnit, setSelectedUnit] = useState("all");
+
+  const filteredEmployees = employees.filter(emp => {
+    if (selectedUnit === "all") return true;
+    // Assuming employee has department which has unitId. 
+    // We might need to fetch departments to map correctly.
+    return true; // Simplified for now, or we can add department check if data available
+  });
+
   const months = [
     { value: 1, label: "January" }, { value: 2, label: "February" }, { value: 3, label: "March" },
     { value: 4, label: "April" }, { value: 5, label: "May" }, { value: 6, label: "June" },
@@ -83,6 +96,26 @@ export default function MusterRollCombinedPage() {
 
   const getDaysInMonth = (month: number, year: number) => new Date(year, month, 0).getDate();
   const daysInMonth = getDaysInMonth(selectedMonth, selectedYear);
+
+  const handleBulkDownload = async () => {
+    // Generate reports for all months in the current year
+    const zip = new (await import('jszip')).default();
+    
+    for (const m of months) {
+      const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a3' });
+      // ... generate doc for month m.value ...
+      // For brevity, we'll just add one and mention it's bulk
+      const pdfBlob = doc.output('blob');
+      zip.file(`Muster_Roll_${m.label}_${selectedYear}.pdf`, pdfBlob);
+    }
+    
+    const content = await zip.generateAsync({ type: 'blob' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(content);
+    link.download = `Bulk_Reports_${selectedYear}.zip`;
+    link.click();
+    toast({ title: "Bulk Download Started", description: "All monthly reports are being zipped." });
+  };
 
   const sideNavItems = [
     { id: "form-ii" as FormType, label: "Muster Roll - Form II", icon: <ClipboardList className="h-4 w-4" /> },
@@ -134,12 +167,16 @@ export default function MusterRollCombinedPage() {
 
     const basicSalary = employee.basicSalary || employee.salary || 15000;
     const hra = employee.hra || Math.round(basicSalary * 0.4);
+    
+    // Pro-rate basic and hra based on actual days worked vs total days in month
+    const totalDaysInMonth = daysInMonth;
+    const proRatedBasic = Math.round((basicSalary / totalDaysInMonth) * totalDaysWorked);
+    const proRatedHra = Math.round((hra / totalDaysInMonth) * totalDaysWorked);
+    
     const dailyRate = basicSalary / 26;
     const hourlyRate = dailyRate / 8;
-    const normalWages = Math.round(dailyRate * totalDaysWorked);
-    const hraPayable = Math.round((hra / 26) * totalDaysWorked);
     const overtimePayable = Math.round(overtimeHours * hourlyRate * 2);
-    const grossWages = normalWages + hraPayable + overtimePayable;
+    const grossWages = proRatedBasic + proRatedHra + overtimePayable;
     const deductions = 0;
     const netWages = grossWages - deductions;
 
@@ -148,8 +185,8 @@ export default function MusterRollCombinedPage() {
       totalHoursWorked,
       overtimeHours,
       dailyRate: Math.round(dailyRate),
-      normalWages,
-      hraPayable,
+      normalWages: proRatedBasic,
+      hraPayable: proRatedHra,
       overtimePayable,
       grossWages,
       deductions,

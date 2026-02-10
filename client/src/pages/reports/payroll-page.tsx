@@ -23,6 +23,7 @@ export default function PayrollReportPage() {
   const { data: units = [] } = useQuery<Unit[]>({ queryKey: ["/api/masters/units"] });
   const { data: employees = [] } = useQuery<User[]>({ queryKey: ["/api/employees"] });
   const { data: departments = [] } = useQuery<Department[]>({ queryKey: ["/api/departments"] });
+  const { data: paymentRecords = [] } = useQuery<any[]>({ queryKey: ["/api/payroll/payments"] });
 
   const toggleDept = (deptId: number) => {
     const newSet = new Set(expandedDepts);
@@ -35,17 +36,49 @@ export default function PayrollReportPage() {
     selectedUnit === "all" || d.unitId === parseInt(selectedUnit)
   );
 
+  const getEmployeePayroll = (userId: number) => {
+    const records = paymentRecords.filter(r => r.employeeId === userId && r.month === selectedMonth);
+    const totalAmount = records.reduce((sum, r) => sum + r.amount, 0);
+    return { totalAmount, count: records.length };
+  };
+
+  const totalMonthlyPayroll = paymentRecords
+    .filter(r => r.month === selectedMonth)
+    .reduce((sum, r) => sum + r.amount, 0);
+
   const payrollStats = [
-    { title: "Total Payroll", value: "₹45,60,000", icon: <IndianRupee className="h-5 w-5" />, color: "bg-teal-50 text-teal-600" },
-    { title: "Net Disbursed", value: "₹38,25,000", icon: <Wallet className="h-5 w-5" />, color: "bg-green-50 text-green-600" },
-    { title: "Total Deductions", value: "₹7,35,000", icon: <TrendingUp className="h-5 w-5" />, color: "bg-red-50 text-red-600" },
-    { title: "Employees Paid", value: employees.length.toString(), icon: <Users className="h-5 w-5" />, color: "bg-blue-50 text-blue-600" },
+    { title: "Total Payroll (Month)", value: `₹${totalMonthlyPayroll.toLocaleString()}`, icon: <IndianRupee className="h-5 w-5" />, color: "bg-teal-50 text-teal-600" },
+    { title: "Units", value: units.length.toString(), icon: <Building2 className="h-5 w-5" />, color: "bg-blue-50 text-blue-600" },
+    { title: "Departments", value: departments.length.toString(), icon: <Users className="h-5 w-5" />, color: "bg-green-50 text-green-600" },
+    { title: "Employees Paid", value: paymentRecords.filter(r => r.month === selectedMonth).length.toString(), icon: <Users className="h-5 w-5" />, color: "bg-blue-50 text-blue-600" },
   ];
 
   const handleExportPDF = () => {
-    const doc = new jsPDF();
+    const doc = new jsPDF({ orientation: 'landscape' });
     addWatermark(doc);
-    addCompanyHeader(doc, { title: "UNIT-WISE PAYROLL REPORT", subtitle: `Period: ${selectedMonth} | Unit: ${selectedUnit}` });
+    addCompanyHeader(doc, { title: "UNIT-WISE PAYROLL REPORT", subtitle: `Period: ${selectedMonth} | Unit: ${selectedUnit === 'all' ? 'All Units' : units.find(u => u.id === parseInt(selectedUnit))?.name}` });
+    
+    const tableData = employees
+      .filter(emp => {
+        const dept = departments.find(d => d.id === emp.departmentId);
+        return selectedUnit === 'all' || (dept && dept.unitId === parseInt(selectedUnit));
+      })
+      .map(emp => {
+        const payroll = getEmployeePayroll(emp.id);
+        return [
+          emp.employeeId || '-',
+          `${emp.firstName} ${emp.lastName}`,
+          departments.find(d => d.id === emp.departmentId)?.name || '-',
+          `₹${payroll.totalAmount.toLocaleString()}`
+        ];
+      });
+
+    (doc as any).autoTable({
+      head: [['Emp ID', 'Name', 'Department', 'Amount Paid']],
+      body: tableData,
+      startY: 70,
+    });
+
     addFooter(doc);
     const refNumber = generateReferenceNumber("PAY");
     addReferenceNumber(doc, refNumber, 68);
@@ -178,6 +211,9 @@ export default function PayrollReportPage() {
                                 <div>
                                   <p className="font-medium">{emp.firstName} {emp.lastName}</p>
                                   <p className="text-xs text-slate-500">{emp.employeeId} | {emp.position}</p>
+                                  <div className="flex items-center gap-2 mt-1">
+                                    <Badge variant="outline" className="text-[10px] h-4">Amount: ₹{getEmployeePayroll(emp.id).totalAmount.toLocaleString()}</Badge>
+                                  </div>
                                 </div>
                               </div>
                               <Button variant="ghost" size="sm" onClick={() => window.location.href=`/employee/${emp.id}`}>View Details</Button>

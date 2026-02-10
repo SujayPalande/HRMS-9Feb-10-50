@@ -23,6 +23,7 @@ export default function LeaveReportPage() {
   const { data: units = [] } = useQuery<Unit[]>({ queryKey: ["/api/masters/units"] });
   const { data: employees = [] } = useQuery<User[]>({ queryKey: ["/api/employees"] });
   const { data: departments = [] } = useQuery<Department[]>({ queryKey: ["/api/departments"] });
+  const { data: leaveRequests = [] } = useQuery<any[]>({ queryKey: ["/api/leave-requests"] });
 
   const toggleDept = (deptId: number) => {
     const newSet = new Set(expandedDepts);
@@ -31,21 +32,61 @@ export default function LeaveReportPage() {
     setExpandedDepts(newSet);
   };
 
+  const getMonthData = (monthYear: string) => {
+    const [monthName, year] = monthYear.split(" ");
+    const monthIndex = new Date(`${monthName} 1, ${year}`).getMonth();
+    const startDate = new Date(parseInt(year), monthIndex, 1);
+    const endDate = new Date(parseInt(year), monthIndex + 1, 0);
+    return { startDate, endDate };
+  };
+
   const filteredDepartments = departments.filter(d => 
     selectedUnit === "all" || d.unitId === parseInt(selectedUnit)
   );
 
+  const { startDate, endDate } = getMonthData(selectedMonth);
+
+  const getEmployeeLeaves = (userId: number) => {
+    const records = leaveRequests.filter(r => {
+      const start = new Date(r.startDate);
+      return r.userId === userId && start >= startDate && start <= endDate && r.status === 'approved';
+    });
+    return records.length;
+  };
+
   const leaveStats = [
-    { title: "Total Leave Taken", value: "456", icon: <CalendarDays className="h-5 w-5" />, color: "bg-teal-50 text-teal-600" },
-    { title: "Pending Requests", value: "12", icon: <Clock className="h-5 w-5" />, color: "bg-yellow-50 text-yellow-600" },
-    { title: "Avg. Leave/Employee", value: "8.5", icon: <Users className="h-5 w-5" />, color: "bg-blue-50 text-blue-600" },
-    { title: "Utilization", value: "65%", icon: <TrendingUp className="h-5 w-5" />, color: "bg-green-50 text-green-600" },
+    { title: "Total Approved Leaves", value: leaveRequests.filter(r => r.status === 'approved').length.toString(), icon: <CalendarDays className="h-5 w-5" />, color: "bg-teal-50 text-teal-600" },
+    { title: "Pending Requests", value: leaveRequests.filter(r => r.status === 'pending').length.toString(), icon: <Clock className="h-5 w-5" />, color: "bg-yellow-50 text-yellow-600" },
+    { title: "Units", value: units.length.toString(), icon: <Building2 className="h-5 w-5" />, color: "bg-blue-50 text-blue-600" },
+    { title: "Departments", value: departments.length.toString(), icon: <Users className="h-5 w-5" />, color: "bg-green-50 text-green-600" },
   ];
 
   const handleExportPDF = () => {
-    const doc = new jsPDF();
+    const doc = new jsPDF({ orientation: 'landscape' });
     addWatermark(doc);
-    addCompanyHeader(doc, { title: "UNIT-WISE LEAVE REPORT", subtitle: `Period: ${selectedMonth} | Unit: ${selectedUnit}` });
+    addCompanyHeader(doc, { title: "UNIT-WISE LEAVE REPORT", subtitle: `Period: ${selectedMonth} | Unit: ${selectedUnit === 'all' ? 'All Units' : units.find(u => u.id === parseInt(selectedUnit))?.name}` });
+    
+    const tableData = employees
+      .filter(emp => {
+        const dept = departments.find(d => d.id === emp.departmentId);
+        return selectedUnit === 'all' || (dept && dept.unitId === parseInt(selectedUnit));
+      })
+      .map(emp => {
+        const leaveCount = getEmployeeLeaves(emp.id);
+        return [
+          emp.employeeId || '-',
+          `${emp.firstName} ${emp.lastName}`,
+          departments.find(d => d.id === emp.departmentId)?.name || '-',
+          leaveCount.toString()
+        ];
+      });
+
+    (doc as any).autoTable({
+      head: [['Emp ID', 'Name', 'Department', 'Approved Leaves']],
+      body: tableData,
+      startY: 70,
+    });
+
     addFooter(doc);
     const refNumber = generateReferenceNumber("LVE");
     addReferenceNumber(doc, refNumber, 68);
@@ -178,10 +219,7 @@ export default function LeaveReportPage() {
                                 <div>
                                   <p className="font-medium">{emp.firstName} {emp.lastName}</p>
                                   <div className="flex items-center gap-2 mt-1">
-                                    <div className="w-24 h-2 bg-slate-100 rounded-full overflow-hidden">
-                                      <div className="h-full bg-teal-500" style={{ width: '65%' }}></div>
-                                    </div>
-                                    <span className="text-xs text-slate-500">65% Utilized</span>
+                                    <Badge variant="outline" className="text-[10px] h-4">Approved Leaves: {getEmployeeLeaves(emp.id)}</Badge>
                                   </div>
                                   <p className="text-xs text-slate-500 mt-1">{emp.employeeId} | {emp.position}</p>
                                 </div>

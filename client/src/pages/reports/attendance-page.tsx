@@ -24,6 +24,7 @@ export default function AttendanceReportPage() {
   const { data: units = [] } = useQuery<Unit[]>({ queryKey: ["/api/masters/units"] });
   const { data: employees = [] } = useQuery<User[]>({ queryKey: ["/api/employees"] });
   const { data: departments = [] } = useQuery<Department[]>({ queryKey: ["/api/departments"] });
+  const { data: attendanceRecords = [] } = useQuery<any[]>({ queryKey: ["/api/attendance"] });
 
   const toggleDept = (deptId: number) => {
     const newSet = new Set(expandedDepts);
@@ -32,21 +33,67 @@ export default function AttendanceReportPage() {
     setExpandedDepts(newSet);
   };
 
+  const getMonthData = (monthYear: string) => {
+    const [monthName, year] = monthYear.split(" ");
+    const monthIndex = new Date(`${monthName} 1, ${year}`).getMonth();
+    const startDate = new Date(parseInt(year), monthIndex, 1);
+    const endDate = new Date(parseInt(year), monthIndex + 1, 0);
+    return { startDate, endDate, monthIndex, year: parseInt(year) };
+  };
+
   const filteredDepartments = departments.filter(d => 
     selectedUnit === "all" || d.unitId === parseInt(selectedUnit)
   );
+
+  const { startDate, endDate } = getMonthData(selectedMonth);
+
+  const getEmployeeAttendance = (userId: number) => {
+    const records = attendanceRecords.filter(r => {
+      const d = new Date(r.date);
+      return r.userId === userId && d >= startDate && d <= endDate;
+    });
+    const present = records.filter(r => r.status === 'present').length;
+    const absent = records.filter(r => r.status === 'absent').length;
+    const halfday = records.filter(r => r.status === 'halfday').length;
+    return { present, absent, halfday, total: records.length };
+  };
 
   const reportStats = [
     { title: "Total Employees", value: employees.length.toString(), icon: <Users className="h-5 w-5" />, color: "bg-teal-50 text-teal-600" },
     { title: "Units", value: units.length.toString(), icon: <Building2 className="h-5 w-5" />, color: "bg-blue-50 text-blue-600" },
     { title: "Departments", value: departments.length.toString(), icon: <ClipboardList className="h-5 w-5" />, color: "bg-yellow-50 text-yellow-600" },
-    { title: "Average Attendance", value: "94.5%", icon: <TrendingUp className="h-5 w-5" />, color: "bg-green-50 text-green-600" },
+    { title: "Present Today", value: attendanceRecords.filter(r => new Date(r.date).toDateString() === new Date().toDateString() && r.status === 'present').length.toString(), icon: <TrendingUp className="h-5 w-5" />, color: "bg-green-50 text-green-600" },
   ];
 
   const handleExportPDF = () => {
-    const doc = new jsPDF();
+    const doc = new jsPDF({ orientation: 'landscape' });
     addWatermark(doc);
-    addCompanyHeader(doc, { title: "UNIT-WISE ATTENDANCE REPORT", subtitle: `Period: ${selectedMonth} | Unit: ${selectedUnit}` });
+    addCompanyHeader(doc, { title: "UNIT-WISE ATTENDANCE REPORT", subtitle: `Period: ${selectedMonth} | Unit: ${selectedUnit === 'all' ? 'All Units' : units.find(u => u.id === parseInt(selectedUnit))?.name}` });
+    
+    const tableData = employees
+      .filter(emp => {
+        const dept = departments.find(d => d.id === emp.departmentId);
+        return selectedUnit === 'all' || (dept && dept.unitId === parseInt(selectedUnit));
+      })
+      .map(emp => {
+        const stats = getEmployeeAttendance(emp.id);
+        return [
+          emp.employeeId || '-',
+          `${emp.firstName} ${emp.lastName}`,
+          departments.find(d => d.id === emp.departmentId)?.name || '-',
+          stats.present.toString(),
+          stats.absent.toString(),
+          stats.halfday.toString(),
+          (stats.present + stats.absent + stats.halfday).toString()
+        ];
+      });
+
+    (doc as any).autoTable({
+      head: [['Emp ID', 'Name', 'Department', 'Present', 'Absent', 'Half Day', 'Total Days']],
+      body: tableData,
+      startY: 70,
+    });
+
     addFooter(doc);
     const refNumber = generateReferenceNumber("ATT");
     addReferenceNumber(doc, refNumber, 68);
@@ -180,8 +227,9 @@ export default function AttendanceReportPage() {
                                   <p className="font-medium">{emp.firstName} {emp.lastName}</p>
                                   <p className="text-xs text-slate-500">{emp.employeeId} | {emp.position}</p>
                                   <div className="flex items-center gap-2 mt-1">
-                                    <Badge variant="outline" className="text-[10px] h-4">Present: 22</Badge>
-                                    <Badge variant="outline" className="text-[10px] h-4 text-red-600 border-red-200">Absent: 2</Badge>
+                                    <Badge variant="outline" className="text-[10px] h-4">Present: {getEmployeeAttendance(emp.id).present}</Badge>
+                                    <Badge variant="outline" className="text-[10px] h-4 text-red-600 border-red-200">Absent: {getEmployeeAttendance(emp.id).absent}</Badge>
+                                    <Badge variant="outline" className="text-[10px] h-4 text-yellow-600 border-yellow-200">Half Day: {getEmployeeAttendance(emp.id).halfday}</Badge>
                                   </div>
                                 </div>
                               </div>
