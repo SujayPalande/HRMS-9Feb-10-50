@@ -98,7 +98,7 @@ export default function LeaveReportPage() {
 
   const handleExportPDF = () => {
     try {
-      const doc = new jsPDF({ orientation: 'landscape' });
+      const doc = new jsPDF({ orientation: 'landscape' }) as any;
       addWatermark(doc);
       addCompanyHeader(doc, { 
         title: "UNIT-WISE LEAVE REPORT", 
@@ -126,8 +126,8 @@ export default function LeaveReportPage() {
           ];
         });
 
-      if ((doc as any).autoTable) {
-        (doc as any).autoTable({
+      if (doc.autoTable) {
+        doc.autoTable({
           head: [['Emp ID', 'Name', 'Department', 'Approved', 'Pending', 'Remaining']],
           body: tableData,
           startY: 70,
@@ -152,6 +152,51 @@ export default function LeaveReportPage() {
         description: "There was an error generating the PDF. Please try again.",
         variant: "destructive"
       });
+    }
+  };
+
+  const handleDownloadIndividualPDF = (emp: User) => {
+    try {
+      const doc = new jsPDF() as any;
+      addWatermark(doc);
+      addCompanyHeader(doc, { 
+        title: "INDIVIDUAL LEAVE REPORT", 
+        subtitle: `${emp.firstName} ${emp.lastName} | ${selectedMonth}` 
+      });
+
+      const stats = getDetailedLeaveStats(emp.id);
+      const dept = departments.find(d => d.id === emp.departmentId);
+
+      doc.autoTable({
+        startY: 70,
+        head: [['Leave Metric', 'Value']],
+        body: [
+          ['Employee Name', `${emp.firstName} ${emp.lastName}`],
+          ['Employee ID', emp.employeeId || '-'],
+          ['Department', dept?.name || '-'],
+          ['Accrued Balance', stats.accrued.toString()],
+          ['Approved Leaves', stats.approved.toString()],
+          ['Pending Requests', stats.pending.toString()],
+          ['Rejected Requests', stats.rejected.toString()],
+          ['Remaining Balance', stats.remaining.toString()],
+          ['Annual (Approved)', stats.byType.annual.toString()],
+          ['Sick (Approved)', stats.byType.sick.toString()],
+          ['Personal (Approved)', stats.byType.personal.toString()],
+        ],
+        headStyles: { fillColor: [15, 23, 42] },
+        theme: 'striped'
+      });
+
+      addFooter(doc);
+      addHRSignature(doc, doc.lastAutoTable.finalY + 20);
+      const refNumber = generateReferenceNumber("IND-LVE");
+      addReferenceNumber(doc, refNumber, 68);
+      addDocumentDate(doc, undefined, 68);
+      doc.save(`leave_${emp.firstName}_${emp.lastName}_${selectedMonth.replace(/\s+/g, '_')}.pdf`);
+      toast({ title: "Individual Leave Report Exported" });
+    } catch (error) {
+      console.error("Individual PDF Export Error:", error);
+      toast({ title: "Export Failed", variant: "destructive" });
     }
   };
 
@@ -367,7 +412,10 @@ export default function LeaveReportPage() {
                                         </div>
                                       </div>
                                     </div>
-                                    <div className="flex items-end justify-end">
+                                    <div className="flex items-end justify-end gap-2">
+                                      <Button variant="outline" size="sm" className="gap-2" onClick={() => handleDownloadIndividualPDF(emp)}>
+                                        <FileDown className="h-4 w-4" /> Download PDF
+                                      </Button>
                                       <Button variant="outline" size="sm" onClick={() => window.location.href=`/employee/${emp.id}`}>
                                         Full Profile History
                                       </Button>

@@ -92,7 +92,7 @@ export default function AttendanceReportPage() {
 
   const handleExportPDF = () => {
     try {
-      const doc = new jsPDF({ orientation: 'landscape' });
+      const doc = new jsPDF({ orientation: 'landscape' }) as any;
       addWatermark(doc);
       addCompanyHeader(doc, { 
         title: "UNIT-WISE ATTENDANCE REPORT", 
@@ -122,8 +122,8 @@ export default function AttendanceReportPage() {
           ];
         });
 
-      if ((doc as any).autoTable) {
-        (doc as any).autoTable({
+      if (doc.autoTable) {
+        doc.autoTable({
           head: [['Emp ID', 'Name', 'Department', 'Present', 'Absent', 'Half Day', 'Late', 'Total Days']],
           body: tableData,
           startY: 70,
@@ -143,6 +143,49 @@ export default function AttendanceReportPage() {
       toast({ title: "PDF Exported Successfully" });
     } catch (error) {
       console.error("PDF Export Error:", error);
+      toast({ title: "Export Failed", variant: "destructive" });
+    }
+  };
+
+  const handleDownloadIndividualPDF = (emp: User) => {
+    try {
+      const doc = new jsPDF() as any;
+      addWatermark(doc);
+      addCompanyHeader(doc, { 
+        title: "INDIVIDUAL ATTENDANCE REPORT", 
+        subtitle: `${emp.firstName} ${emp.lastName} | ${selectedMonth}` 
+      });
+
+      const stats = getDetailedAttendance(emp.id);
+      const dept = departments.find(d => d.id === emp.departmentId);
+
+      doc.autoTable({
+        startY: 70,
+        head: [['Field', 'Details']],
+        body: [
+          ['Employee Name', `${emp.firstName} ${emp.lastName}`],
+          ['Employee ID', emp.employeeId || '-'],
+          ['Department', dept?.name || '-'],
+          ['Position', emp.position || '-'],
+          ['Present Days', stats.present.toString()],
+          ['Absent Days', stats.absent.toString()],
+          ['Half Days', stats.halfday.toString()],
+          ['Late Arrivals', stats.late.toString()],
+          ['Total Recorded Days', (stats.present + stats.absent + stats.halfday).toString()],
+        ],
+        headStyles: { fillColor: [15, 23, 42] },
+        theme: 'striped'
+      });
+
+      addFooter(doc);
+      addHRSignature(doc, doc.lastAutoTable.finalY + 20);
+      const refNumber = generateReferenceNumber("IND-ATT");
+      addReferenceNumber(doc, refNumber, 68);
+      addDocumentDate(doc, undefined, 68);
+      doc.save(`attendance_${emp.firstName}_${emp.lastName}_${selectedMonth.replace(/\s+/g, '_')}.pdf`);
+      toast({ title: "Individual Report Exported" });
+    } catch (error) {
+      console.error("Individual PDF Export Error:", error);
       toast({ title: "Export Failed", variant: "destructive" });
     }
   };
@@ -348,6 +391,9 @@ export default function AttendanceReportPage() {
                                   </div>
                                   
                                   <div className="flex justify-end gap-2">
+                                    <Button variant="outline" size="sm" className="gap-2" onClick={() => handleDownloadIndividualPDF(emp)}>
+                                      <FileDown className="h-4 w-4" /> Download PDF
+                                    </Button>
                                     <Button variant="outline" size="sm" onClick={() => window.location.href=`/attendance/history?id=${emp.id}`}>
                                       View Full History
                                     </Button>

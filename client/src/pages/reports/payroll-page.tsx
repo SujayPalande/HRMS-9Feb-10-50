@@ -110,7 +110,7 @@ export default function PayrollReportPage() {
 
   const handleExportPDF = () => {
     try {
-      const doc = new jsPDF({ orientation: 'landscape' });
+      const doc = new jsPDF({ orientation: 'landscape' }) as any;
       addWatermark(doc);
       addCompanyHeader(doc, { 
         title: "UNIT-WISE PAYROLL REPORT", 
@@ -137,8 +137,8 @@ export default function PayrollReportPage() {
           ];
         });
 
-      if ((doc as any).autoTable) {
-        (doc as any).autoTable({
+      if (doc.autoTable) {
+        doc.autoTable({
           head: [['Emp ID', 'Name', 'Department', 'Amount']],
           body: tableData,
           startY: 70,
@@ -163,6 +163,49 @@ export default function PayrollReportPage() {
         description: "There was an error generating the PDF. Please try again.",
         variant: "destructive"
       });
+    }
+  };
+
+  const handleDownloadIndividualPDF = (emp: User) => {
+    try {
+      const doc = new jsPDF() as any;
+      addWatermark(doc);
+      addCompanyHeader(doc, { 
+        title: "INDIVIDUAL PAYROLL STATEMENT", 
+        subtitle: `${emp.firstName} ${emp.lastName} | ${selectedMonth}` 
+      });
+
+      const payroll = getDetailedPayroll(emp.id);
+      const dept = departments.find(d => d.id === emp.departmentId);
+
+      doc.autoTable({
+        startY: 70,
+        head: [['Payroll Detail', 'Information']],
+        body: [
+          ['Employee Name', `${emp.firstName} ${emp.lastName}`],
+          ['Employee ID', emp.employeeId || '-'],
+          ['Department', dept?.name || '-'],
+          ['Position', emp.position || '-'],
+          ['Disbursed Amount', `₹${payroll.totalAmount.toLocaleString()}`],
+          ['Payment Status', payroll.count > 0 ? 'Disbursed' : 'In Progress'],
+          ['Reference No', payroll.lastRefNo || 'N/A'],
+          ['Payment Date', payroll.lastPaymentDate ? new Date(payroll.lastPaymentDate).toLocaleDateString() : 'N/A'],
+          ['Payment Mode', payroll.lastPaymentMode || 'N/A'],
+        ],
+        headStyles: { fillColor: [15, 23, 42] },
+        theme: 'striped'
+      });
+
+      addFooter(doc);
+      addHRSignature(doc, doc.lastAutoTable.finalY + 20);
+      const refNumber = generateReferenceNumber("IND-PAY");
+      addReferenceNumber(doc, refNumber, 68);
+      addDocumentDate(doc, undefined, 68);
+      doc.save(`payroll_${emp.firstName}_${emp.lastName}_${selectedMonth.replace(/\s+/g, '_')}.pdf`);
+      toast({ title: "Individual Payroll Statement Exported" });
+    } catch (error) {
+      console.error("Individual PDF Export Error:", error);
+      toast({ title: "Export Failed", variant: "destructive" });
     }
   };
 
@@ -354,7 +397,10 @@ export default function PayrollReportPage() {
                                     </div>
                                   </div>
                                   
-                                  <div className="mt-4 flex justify-end">
+                                  <div className="mt-4 flex justify-end gap-2">
+                                    <Button variant="outline" size="sm" className="gap-2" onClick={() => handleDownloadIndividualPDF(emp)}>
+                                      <FileDown className="h-4 w-4" /> Download PDF
+                                    </Button>
                                     <Button variant="outline" size="sm" onClick={() => window.location.href=`/payroll/payslips?id=${emp.id}`}>
                                       View Detailed Payslip
                                     </Button>

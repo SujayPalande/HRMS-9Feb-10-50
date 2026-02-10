@@ -250,3 +250,6 @@
 [x] 250. Created and configured PostgreSQL database with environment variables - February 10, 2026
 [x] 251. Applied database schema using drizzle-kit push command - February 10, 2026
 [x] 252. ALL MIGRATION TASKS COMPLETE: Application successfully running on port 5000 - February 10, 2026
+[x] 253. Fixed PDF export issues in attendance, leave, and payroll reports by ensuring autoTable is properly initialized.
+[x] 254. Implemented individual employee PDF report downloads in attendance, leave, and payroll reports.
+[x] 255. Verified all changes and restarted workflow - February 10, 2026
