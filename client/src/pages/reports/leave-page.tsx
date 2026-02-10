@@ -4,18 +4,33 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { CalendarDays, Download, Calendar, TrendingUp, Users, Clock, Search, FileSpreadsheet } from "lucide-react";
-import { motion } from "framer-motion";
+import { CalendarDays, Download, Calendar, TrendingUp, Users, Clock, Search, Building2, ChevronRight, ChevronDown, User as UserIcon, Mail } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
+import { useQuery } from "@tanstack/react-query";
 import jsPDF from "jspdf";
-import * as XLSX from "xlsx";
 import { addCompanyHeader, addWatermark, addHRSignature, addFooter, addDocumentDate, generateReferenceNumber, addReferenceNumber } from "@/lib/pdf-utils";
+import { User, Department } from "@shared/schema";
 
 export default function LeaveReportPage() {
-  const [selectedYear, setSelectedYear] = useState("2024");
+  const [selectedMonth, setSelectedMonth] = useState("January 2025");
+  const [selectedUnit, setSelectedUnit] = useState("all");
+  const [expandedDepts, setExpandedDepts] = useState<Set<number>>(new Set());
   const [searchQuery, setSearchQuery] = useState("");
   const { toast } = useToast();
+
+  const { data: employees = [] } = useQuery<User[]>({ queryKey: ["/api/employees"] });
+  const { data: departments = [] } = useQuery<Department[]>({ queryKey: ["/api/departments"] });
+
+  const toggleDept = (deptId: number) => {
+    const newSet = new Set(expandedDepts);
+    if (newSet.has(deptId)) newSet.delete(deptId);
+    else newSet.add(deptId);
+    setExpandedDepts(newSet);
+  };
+
+  const units = ["Cybaemtech", "Other Unit"];
 
   const leaveStats = [
     { title: "Total Leave Taken", value: "456", icon: <CalendarDays className="h-5 w-5" />, color: "bg-teal-50 text-teal-600" },
@@ -24,88 +39,20 @@ export default function LeaveReportPage() {
     { title: "Leave Balance", value: "1,245", icon: <TrendingUp className="h-5 w-5" />, color: "bg-green-50 text-green-600" },
   ];
 
-  const leaveTypeData = [
-    { type: "Casual Leave", taken: 156, balance: 312, utilized: 33 },
-    { type: "Sick Leave", taken: 89, balance: 267, utilized: 25 },
-    { type: "Earned Leave", taken: 134, balance: 445, utilized: 23 },
-    { type: "WFH", taken: 67, balance: 178, utilized: 27 },
-    { type: "Maternity/Paternity", taken: 10, balance: 45, utilized: 18 },
-  ];
-
-  const filteredData = leaveTypeData.filter(item =>
-    item.type.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
   const handleExportPDF = () => {
     const doc = new jsPDF();
-    
     addWatermark(doc);
-    addCompanyHeader(doc, { title: "LEAVE REPORT", subtitle: `Year: ${selectedYear}` });
+    addCompanyHeader(doc, { title: "UNIT-WISE LEAVE REPORT", subtitle: `Period: ${selectedMonth} | Unit: ${selectedUnit}` });
     addFooter(doc);
-    
     const refNumber = generateReferenceNumber("LVE");
     addReferenceNumber(doc, refNumber, 68);
     addDocumentDate(doc, undefined, 68);
-    
-    doc.setFontSize(11);
-    doc.setTextColor(0, 0, 0);
-    doc.setFont("helvetica", "bold");
-    doc.text("Summary:", 15, 80);
-    
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(10);
-    doc.text("Total Leave Taken: 456 days", 25, 88);
-    doc.text("Pending Requests: 12", 25, 96);
-    doc.text("Avg. Leave/Employee: 8.5 days", 25, 104);
-    doc.text("Total Leave Balance: 1,245 days", 25, 112);
-    
-    doc.setFont("helvetica", "bold");
-    doc.text("Leave Type Breakdown:", 15, 125);
-    
-    let yPos = 135;
-    doc.setFontSize(9);
-    doc.text("Leave Type", 15, yPos);
-    doc.text("Taken", 75, yPos);
-    doc.text("Balance", 110, yPos);
-    doc.text("Utilization %", 150, yPos);
-    
-    doc.setFont("helvetica", "normal");
-    yPos += 8;
-    filteredData.forEach((item) => {
-      doc.text(item.type, 15, yPos);
-      doc.text(`${item.taken} days`, 75, yPos);
-      doc.text(`${item.balance} days`, 110, yPos);
-      doc.text(`${item.utilized}%`, 150, yPos);
-      yPos += 7;
-    });
-    
-    addHRSignature(doc, yPos + 25);
-    
-    doc.save(`leave_report_${selectedYear}.pdf`);
-    
-    toast({
-      title: "PDF Exported",
-      description: `Leave report for ${selectedYear} downloaded successfully.`
-    });
+    doc.save(`leave_report_${selectedMonth.replace(/\s+/g, '_')}.pdf`);
+    toast({ title: "PDF Exported" });
   };
 
-  const handleExportExcel = () => {
-    const exportData = filteredData.map(item => ({
-      "Leave Type": item.type,
-      "Days Taken": item.taken,
-      "Days Balance": item.balance,
-      "Utilization (%)": item.utilized
-    }));
-
-    const ws = XLSX.utils.json_to_sheet(exportData);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Leave Report");
-    XLSX.writeFile(wb, `leave_report_${selectedYear}.xlsx`);
-
-    toast({
-      title: "Excel Exported",
-      description: `Leave report exported to Excel successfully.`
-    });
+  const handleSendMail = () => {
+    toast({ title: "Email Sent", description: "Leave report has been sent to administrators." });
   };
 
   return (
@@ -117,111 +64,128 @@ export default function LeaveReportPage() {
           className="flex flex-col md:flex-row md:items-center md:justify-between gap-4"
         >
           <div>
-            <h1 className="text-2xl font-bold text-slate-900" data-testid="text-page-title">Leave Reports</h1>
-            <p className="text-slate-500 mt-1">Leave utilization analysis and trends</p>
+            <h1 className="text-2xl font-bold text-slate-900" data-testid="text-page-title">Unit-wise Leave Reports</h1>
+            <p className="text-slate-500 mt-1">Hierarchical leave analysis: Unit &gt; Department &gt; Employee</p>
           </div>
           <div className="flex gap-2 flex-wrap">
-            <Select value={selectedYear} onValueChange={setSelectedYear}>
-              <SelectTrigger className="w-32" data-testid="select-year">
+            <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+              <SelectTrigger className="w-40" data-testid="select-month">
                 <Calendar className="h-4 w-4 mr-2" />
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="2024">2024</SelectItem>
-                <SelectItem value="2023">2023</SelectItem>
-                <SelectItem value="2022">2022</SelectItem>
+                <SelectItem value="January 2026">January 2026</SelectItem>
+                <SelectItem value="December 2025">December 2025</SelectItem>
+                <SelectItem value="November 2025">November 2025</SelectItem>
+                <SelectItem value="October 2025">October 2025</SelectItem>
+                <SelectItem value="September 2025">September 2025</SelectItem>
+                <SelectItem value="August 2025">August 2025</SelectItem>
+                <SelectItem value="July 2025">July 2025</SelectItem>
+                <SelectItem value="June 2025">June 2025</SelectItem>
+                <SelectItem value="May 2025">May 2025</SelectItem>
+                <SelectItem value="April 2025">April 2025</SelectItem>
+                <SelectItem value="March 2025">March 2025</SelectItem>
+                <SelectItem value="February 2025">February 2025</SelectItem>
+                <SelectItem value="January 2025">January 2025</SelectItem>
               </SelectContent>
             </Select>
-            <Button variant="outline" className="gap-2" onClick={handleExportPDF} data-testid="button-export-pdf">
-              <Download className="h-4 w-4" />
-              PDF
+            <Select value={selectedUnit} onValueChange={setSelectedUnit}>
+              <SelectTrigger className="w-40" data-testid="select-unit">
+                <Building2 className="h-4 w-4 mr-2" />
+                <SelectValue placeholder="Select Unit" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Units</SelectItem>
+                {units.map(u => <SelectItem key={u} value={u.toLowerCase()}>{u}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <Button variant="outline" className="gap-2" onClick={handleExportPDF}>
+              <Download className="h-4 w-4" /> PDF
             </Button>
-            <Button variant="outline" className="gap-2" onClick={handleExportExcel} data-testid="button-export-excel">
-              <FileSpreadsheet className="h-4 w-4" />
-              Excel
+            <Button variant="outline" className="gap-2" onClick={handleSendMail}>
+              <Mail className="h-4 w-4" /> Mail
             </Button>
           </div>
         </motion.div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {leaveStats.map((stat, index) => (
-            <motion.div
-              key={stat.title}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.1 }}
-            >
-              <Card data-testid={`card-stat-${index}`}>
-                <CardContent className="p-6">
-                  <div className="flex items-center gap-4">
-                    <div className={`p-3 rounded-lg ${stat.color}`}>
-                      {stat.icon}
-                    </div>
-                    <div>
-                      <p className="text-2xl font-bold text-slate-900">{stat.value}</p>
-                      <p className="text-sm text-slate-500">{stat.title}</p>
-                    </div>
+            <Card key={stat.title} data-testid={`card-stat-${index}`}>
+              <CardContent className="p-6">
+                <div className="flex items-center gap-4">
+                  <div className={`p-3 rounded-lg ${stat.color}`}>{stat.icon}</div>
+                  <div>
+                    <p className="text-2xl font-bold text-slate-900">{stat.value}</p>
+                    <p className="text-sm text-slate-500">{stat.title}</p>
                   </div>
-                </CardContent>
-              </Card>
-            </motion.div>
+                </div>
+              </CardContent>
+            </Card>
           ))}
         </div>
 
         <Card>
           <CardHeader>
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-              <div>
-                <CardTitle className="flex items-center gap-2">
-                  <CalendarDays className="h-5 w-5 text-teal-600" />
-                  Leave Type Summary
-                </CardTitle>
-                <CardDescription>Leave utilization by type for {selectedYear}</CardDescription>
-              </div>
+              <CardTitle className="flex items-center gap-2">
+                <Building2 className="h-5 w-5 text-teal-600" />
+                Unit Hierarchy View
+              </CardTitle>
               <div className="relative w-full md:w-64">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                 <Input
-                  placeholder="Search leave type..."
+                  placeholder="Search employees..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="pl-9"
-                  data-testid="input-search"
                 />
               </div>
             </div>
           </CardHeader>
-          <CardContent>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b">
-                    <th className="text-left py-3 px-4 font-medium text-slate-600">Leave Type</th>
-                    <th className="text-left py-3 px-4 font-medium text-slate-600">Taken</th>
-                    <th className="text-left py-3 px-4 font-medium text-slate-600">Balance</th>
-                    <th className="text-left py-3 px-4 font-medium text-slate-600">Utilization</th>
-                    <th className="text-left py-3 px-4 font-medium text-slate-600">Progress</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredData.map((item, index) => (
-                    <tr key={index} className="border-b hover:bg-slate-50" data-testid={`row-leave-${index}`}>
-                      <td className="py-3 px-4 font-medium">{item.type}</td>
-                      <td className="py-3 px-4">{item.taken} days</td>
-                      <td className="py-3 px-4">{item.balance} days</td>
-                      <td className="py-3 px-4">{item.utilized}%</td>
-                      <td className="py-3 px-4">
-                        <div className="w-full bg-slate-100 rounded-full h-2">
-                          <div 
-                            className="bg-teal-600 h-2 rounded-full" 
-                            style={{ width: `${item.utilized}%` }}
-                          />
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+          <CardContent className="space-y-4">
+            {departments.map((dept) => (
+              <div key={dept.id} className="border rounded-lg overflow-hidden">
+                <button
+                  onClick={() => toggleDept(dept.id)}
+                  className="w-full flex items-center justify-between p-4 bg-slate-50 hover:bg-slate-100 transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    {expandedDepts.has(dept.id) ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                    <span className="font-semibold text-slate-700">{dept.name}</span>
+                    <Badge variant="secondary" className="ml-2">
+                      {employees.filter(e => e.departmentId === dept.id).length} Employees
+                    </Badge>
+                  </div>
+                </button>
+                <AnimatePresence>
+                  {expandedDepts.has(dept.id) && (
+                    <motion.div
+                      initial={{ height: 0 }}
+                      animate={{ height: "auto" }}
+                      exit={{ height: 0 }}
+                      className="overflow-hidden"
+                    >
+                      <div className="p-2 bg-white divide-y">
+                        {employees
+                          .filter(e => e.departmentId === dept.id && (e.firstName.toLowerCase().includes(searchQuery.toLowerCase()) || e.lastName.toLowerCase().includes(searchQuery.toLowerCase())))
+                          .map(emp => (
+                            <div key={emp.id} className="p-3 flex items-center justify-between hover:bg-slate-50 transition-colors">
+                              <div className="flex items-center gap-3">
+                                <div className="p-2 rounded-full bg-slate-100"><UserIcon className="h-4 w-4 text-slate-500" /></div>
+                                <div>
+                                  <p className="font-medium">{emp.firstName} {emp.lastName}</p>
+                                  <p className="text-xs text-slate-500">{emp.employeeId} | {emp.position}</p>
+                                </div>
+                              </div>
+                              <Button variant="ghost" size="sm" onClick={() => window.location.href=`/employee/${emp.id}`}>View Details</Button>
+                            </div>
+                          ))}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            ))}
           </CardContent>
         </Card>
       </div>

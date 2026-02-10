@@ -15,7 +15,7 @@ import { addCompanyHeader, addWatermark, addHRSignature, addFooter, addDocumentD
 import { User, Department } from "@shared/schema";
 
 export default function AttendanceReportPage() {
-  const [selectedMonth, setSelectedMonth] = useState("January 2024");
+  const [selectedMonth, setSelectedMonth] = useState("January 2025");
   const [selectedUnit, setSelectedUnit] = useState("all");
   const [expandedDepts, setExpandedDepts] = useState<Set<number>>(new Set());
   const [searchQuery, setSearchQuery] = useState("");
@@ -75,8 +75,19 @@ export default function AttendanceReportPage() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="January 2024">January 2024</SelectItem>
-                <SelectItem value="December 2023">December 2023</SelectItem>
+                <SelectItem value="January 2026">January 2026</SelectItem>
+                <SelectItem value="December 2025">December 2025</SelectItem>
+                <SelectItem value="November 2025">November 2025</SelectItem>
+                <SelectItem value="October 2025">October 2025</SelectItem>
+                <SelectItem value="September 2025">September 2025</SelectItem>
+                <SelectItem value="August 2025">August 2025</SelectItem>
+                <SelectItem value="July 2025">July 2025</SelectItem>
+                <SelectItem value="June 2025">June 2025</SelectItem>
+                <SelectItem value="May 2025">May 2025</SelectItem>
+                <SelectItem value="April 2025">April 2025</SelectItem>
+                <SelectItem value="March 2025">March 2025</SelectItem>
+                <SelectItem value="February 2025">February 2025</SelectItem>
+                <SelectItem value="January 2025">January 2025</SelectItem>
               </SelectContent>
             </Select>
             <Select value={selectedUnit} onValueChange={setSelectedUnit}>
@@ -167,7 +178,7 @@ export default function AttendanceReportPage() {
                                   <p className="text-xs text-slate-500">{emp.employeeId} | {emp.position}</p>
                                 </div>
                               </div>
-                              <Button variant="ghost" size="sm" onClick={() => window.location.href=`/employees/${emp.id}`}>View Details</Button>
+                              <Button variant="ghost" size="sm" onClick={() => window.location.href=`/employee/${emp.id}`}>View Details</Button>
                             </div>
                           ))}
                       </div>

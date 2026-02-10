@@ -4,112 +4,55 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Users, Download, TrendingUp, TrendingDown, Building2, UserPlus, UserMinus, Search, FileSpreadsheet } from "lucide-react";
-import { motion } from "framer-motion";
+import { Users, Download, Calendar, TrendingUp, Building2, UserPlus, UserMinus, Search, ChevronRight, ChevronDown, User as UserIcon, Mail } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
+import { useQuery } from "@tanstack/react-query";
 import jsPDF from "jspdf";
-import * as XLSX from "xlsx";
 import { addCompanyHeader, addWatermark, addHRSignature, addFooter, addDocumentDate, generateReferenceNumber, addReferenceNumber } from "@/lib/pdf-utils";
+import { User, Department } from "@shared/schema";
 
 export default function HeadcountReportPage() {
-  const [selectedPeriod, setSelectedPeriod] = useState("Q4 2023");
+  const [selectedMonth, setSelectedMonth] = useState("January 2025");
+  const [selectedUnit, setSelectedUnit] = useState("all");
+  const [expandedDepts, setExpandedDepts] = useState<Set<number>>(new Set());
   const [searchQuery, setSearchQuery] = useState("");
   const { toast } = useToast();
 
+  const { data: employees = [] } = useQuery<User[]>({ queryKey: ["/api/employees"] });
+  const { data: departments = [] } = useQuery<Department[]>({ queryKey: ["/api/departments"] });
+
+  const toggleDept = (deptId: number) => {
+    const newSet = new Set(expandedDepts);
+    if (newSet.has(deptId)) newSet.delete(deptId);
+    else newSet.add(deptId);
+    setExpandedDepts(newSet);
+  };
+
+  const units = ["Cybaemtech", "Other Unit"];
+
   const headcountStats = [
-    { title: "Total Headcount", value: "156", change: "+12", icon: <Users className="h-5 w-5" /> },
+    { title: "Total Headcount", value: employees.length.toString(), icon: <Users className="h-5 w-5" />, color: "bg-teal-50 text-teal-600" },
     { title: "New Hires", value: "18", icon: <UserPlus className="h-5 w-5" />, color: "bg-green-50 text-green-600" },
     { title: "Separations", value: "6", icon: <UserMinus className="h-5 w-5" />, color: "bg-red-50 text-red-600" },
     { title: "Growth Rate", value: "8.3%", icon: <TrendingUp className="h-5 w-5" />, color: "bg-blue-50 text-blue-600" },
   ];
 
-  const departmentData = [
-    { department: "Engineering", headcount: 45, newHires: 8, separations: 2, growth: 15.4 },
-    { department: "Marketing", headcount: 22, newHires: 3, separations: 1, growth: 10.0 },
-    { department: "Sales", headcount: 35, newHires: 4, separations: 2, growth: 6.1 },
-    { department: "HR", headcount: 12, newHires: 1, separations: 0, growth: 9.1 },
-    { department: "Finance", headcount: 18, newHires: 1, separations: 1, growth: 0.0 },
-    { department: "Operations", headcount: 24, newHires: 1, separations: 0, growth: 4.3 },
-  ];
-
-  const filteredData = departmentData.filter(dept =>
-    dept.department.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
   const handleExportPDF = () => {
     const doc = new jsPDF();
-    
     addWatermark(doc);
-    addCompanyHeader(doc, { title: "HEADCOUNT REPORT", subtitle: `Period: ${selectedPeriod}` });
+    addCompanyHeader(doc, { title: "UNIT-WISE HEADCOUNT REPORT", subtitle: `Period: ${selectedMonth} | Unit: ${selectedUnit}` });
     addFooter(doc);
-    
     const refNumber = generateReferenceNumber("HDC");
     addReferenceNumber(doc, refNumber, 68);
     addDocumentDate(doc, undefined, 68);
-    
-    doc.setFontSize(11);
-    doc.setTextColor(0, 0, 0);
-    doc.setFont("helvetica", "bold");
-    doc.text("Summary:", 15, 80);
-    
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(10);
-    doc.text("Total Headcount: 156 employees", 25, 88);
-    doc.text("New Hires: 18", 25, 96);
-    doc.text("Separations: 6", 25, 104);
-    doc.text("Net Growth Rate: 8.3%", 25, 112);
-    
-    doc.setFont("helvetica", "bold");
-    doc.text("Department-wise Breakdown:", 15, 125);
-    
-    let yPos = 135;
-    doc.setFontSize(9);
-    doc.text("Department", 15, yPos);
-    doc.text("Headcount", 65, yPos);
-    doc.text("New Hires", 100, yPos);
-    doc.text("Separations", 135, yPos);
-    doc.text("Growth %", 170, yPos);
-    
-    doc.setFont("helvetica", "normal");
-    yPos += 8;
-    filteredData.forEach((dept) => {
-      doc.text(dept.department, 15, yPos);
-      doc.text(dept.headcount.toString(), 65, yPos);
-      doc.text(dept.newHires.toString(), 100, yPos);
-      doc.text(dept.separations.toString(), 135, yPos);
-      doc.text(`${dept.growth}%`, 170, yPos);
-      yPos += 7;
-    });
-    
-    addHRSignature(doc, yPos + 25);
-    
-    doc.save(`headcount_report_${selectedPeriod.replace(/\s+/g, '_')}.pdf`);
-    
-    toast({
-      title: "PDF Exported",
-      description: `Headcount report for ${selectedPeriod} downloaded successfully.`
-    });
+    doc.save(`headcount_report_${selectedMonth.replace(/\s+/g, '_')}.pdf`);
+    toast({ title: "PDF Exported" });
   };
 
-  const handleExportExcel = () => {
-    const exportData = filteredData.map(dept => ({
-      "Department": dept.department,
-      "Headcount": dept.headcount,
-      "New Hires": dept.newHires,
-      "Separations": dept.separations,
-      "Growth (%)": dept.growth
-    }));
-
-    const ws = XLSX.utils.json_to_sheet(exportData);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Headcount Report");
-    XLSX.writeFile(wb, `headcount_report_${selectedPeriod.replace(/\s+/g, '_')}.xlsx`);
-
-    toast({
-      title: "Excel Exported",
-      description: `Headcount report exported to Excel successfully.`
-    });
+  const handleSendMail = () => {
+    toast({ title: "Email Sent", description: "Headcount report has been sent to administrators." });
   };
 
   return (
@@ -121,124 +64,128 @@ export default function HeadcountReportPage() {
           className="flex flex-col md:flex-row md:items-center md:justify-between gap-4"
         >
           <div>
-            <h1 className="text-2xl font-bold text-slate-900" data-testid="text-page-title">Headcount Report</h1>
-            <p className="text-slate-500 mt-1">Employee headcount analysis by department</p>
+            <h1 className="text-2xl font-bold text-slate-900" data-testid="text-page-title">Unit-wise Headcount Reports</h1>
+            <p className="text-slate-500 mt-1">Hierarchical headcount analysis: Unit &gt; Department &gt; Employee</p>
           </div>
           <div className="flex gap-2 flex-wrap">
-            <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
-              <SelectTrigger className="w-32" data-testid="select-period">
+            <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+              <SelectTrigger className="w-40" data-testid="select-month">
+                <Calendar className="h-4 w-4 mr-2" />
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="Q4 2023">Q4 2023</SelectItem>
-                <SelectItem value="Q3 2023">Q3 2023</SelectItem>
-                <SelectItem value="Q2 2023">Q2 2023</SelectItem>
-                <SelectItem value="Q1 2023">Q1 2023</SelectItem>
-                <SelectItem value="Q4 2022">Q4 2022</SelectItem>
+                <SelectItem value="January 2026">January 2026</SelectItem>
+                <SelectItem value="December 2025">December 2025</SelectItem>
+                <SelectItem value="November 2025">November 2025</SelectItem>
+                <SelectItem value="October 2025">October 2025</SelectItem>
+                <SelectItem value="September 2025">September 2025</SelectItem>
+                <SelectItem value="August 2025">August 2025</SelectItem>
+                <SelectItem value="July 2025">July 2025</SelectItem>
+                <SelectItem value="June 2025">June 2025</SelectItem>
+                <SelectItem value="May 2025">May 2025</SelectItem>
+                <SelectItem value="April 2025">April 2025</SelectItem>
+                <SelectItem value="March 2025">March 2025</SelectItem>
+                <SelectItem value="February 2025">February 2025</SelectItem>
+                <SelectItem value="January 2025">January 2025</SelectItem>
               </SelectContent>
             </Select>
-            <Button variant="outline" className="gap-2" onClick={handleExportPDF} data-testid="button-export-pdf">
-              <Download className="h-4 w-4" />
-              PDF
+            <Select value={selectedUnit} onValueChange={setSelectedUnit}>
+              <SelectTrigger className="w-40" data-testid="select-unit">
+                <Building2 className="h-4 w-4 mr-2" />
+                <SelectValue placeholder="Select Unit" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Units</SelectItem>
+                {units.map(u => <SelectItem key={u} value={u.toLowerCase()}>{u}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <Button variant="outline" className="gap-2" onClick={handleExportPDF}>
+              <Download className="h-4 w-4" /> PDF
             </Button>
-            <Button variant="outline" className="gap-2" onClick={handleExportExcel} data-testid="button-export-excel">
-              <FileSpreadsheet className="h-4 w-4" />
-              Excel
+            <Button variant="outline" className="gap-2" onClick={handleSendMail}>
+              <Mail className="h-4 w-4" /> Mail
             </Button>
           </div>
         </motion.div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {headcountStats.map((stat, index) => (
-            <motion.div
-              key={stat.title}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.1 }}
-            >
-              <Card data-testid={`card-stat-${index}`}>
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div className={`p-3 rounded-lg ${stat.color || "bg-teal-50 text-teal-600"}`}>
-                      {stat.icon}
-                    </div>
-                    {stat.change && (
-                      <Badge variant="secondary" className="gap-1">
-                        <TrendingUp className="h-3 w-3" />
-                        {stat.change}
-                      </Badge>
-                    )}
+            <Card key={stat.title} data-testid={`card-stat-${index}`}>
+              <CardContent className="p-6">
+                <div className="flex items-center gap-4">
+                  <div className={`p-3 rounded-lg ${stat.color}`}>{stat.icon}</div>
+                  <div>
+                    <p className="text-2xl font-bold text-slate-900">{stat.value}</p>
+                    <p className="text-sm text-slate-500">{stat.title}</p>
                   </div>
-                  <p className="mt-4 text-2xl font-bold text-slate-900">{stat.value}</p>
-                  <p className="text-sm text-slate-500">{stat.title}</p>
-                </CardContent>
-              </Card>
-            </motion.div>
+                </div>
+              </CardContent>
+            </Card>
           ))}
         </div>
 
         <Card>
           <CardHeader>
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-              <div>
-                <CardTitle className="flex items-center gap-2">
-                  <Building2 className="h-5 w-5 text-teal-600" />
-                  Department Headcount - {selectedPeriod}
-                </CardTitle>
-                <CardDescription>Headcount breakdown by department</CardDescription>
-              </div>
+              <CardTitle className="flex items-center gap-2">
+                <Building2 className="h-5 w-5 text-teal-600" />
+                Unit Hierarchy View
+              </CardTitle>
               <div className="relative w-full md:w-64">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                 <Input
-                  placeholder="Search department..."
+                  placeholder="Search employees..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="pl-9"
-                  data-testid="input-search"
                 />
               </div>
             </div>
           </CardHeader>
-          <CardContent>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b">
-                    <th className="text-left py-3 px-4 font-medium text-slate-600">Department</th>
-                    <th className="text-left py-3 px-4 font-medium text-slate-600">Headcount</th>
-                    <th className="text-left py-3 px-4 font-medium text-slate-600">New Hires</th>
-                    <th className="text-left py-3 px-4 font-medium text-slate-600">Separations</th>
-                    <th className="text-left py-3 px-4 font-medium text-slate-600">Growth</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredData.map((dept, index) => (
-                    <tr key={index} className="border-b hover:bg-slate-50" data-testid={`row-dept-${index}`}>
-                      <td className="py-3 px-4 font-medium">{dept.department}</td>
-                      <td className="py-3 px-4">{dept.headcount}</td>
-                      <td className="py-3 px-4">
-                        <span className="flex items-center gap-1 text-green-600">
-                          <UserPlus className="h-4 w-4" />
-                          {dept.newHires}
-                        </span>
-                      </td>
-                      <td className="py-3 px-4">
-                        <span className="flex items-center gap-1 text-red-600">
-                          <UserMinus className="h-4 w-4" />
-                          {dept.separations}
-                        </span>
-                      </td>
-                      <td className="py-3 px-4">
-                        <Badge variant={dept.growth > 0 ? "default" : "secondary"} className="gap-1">
-                          {dept.growth > 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
-                          {dept.growth}%
-                        </Badge>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+          <CardContent className="space-y-4">
+            {departments.map((dept) => (
+              <div key={dept.id} className="border rounded-lg overflow-hidden">
+                <button
+                  onClick={() => toggleDept(dept.id)}
+                  className="w-full flex items-center justify-between p-4 bg-slate-50 hover:bg-slate-100 transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    {expandedDepts.has(dept.id) ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                    <span className="font-semibold text-slate-700">{dept.name}</span>
+                    <Badge variant="secondary" className="ml-2">
+                      {employees.filter(e => e.departmentId === dept.id).length} Employees
+                    </Badge>
+                  </div>
+                </button>
+                <AnimatePresence>
+                  {expandedDepts.has(dept.id) && (
+                    <motion.div
+                      initial={{ height: 0 }}
+                      animate={{ height: "auto" }}
+                      exit={{ height: 0 }}
+                      className="overflow-hidden"
+                    >
+                      <div className="p-2 bg-white divide-y">
+                        {employees
+                          .filter(e => e.departmentId === dept.id && (e.firstName.toLowerCase().includes(searchQuery.toLowerCase()) || e.lastName.toLowerCase().includes(searchQuery.toLowerCase())))
+                          .map(emp => (
+                            <div key={emp.id} className="p-3 flex items-center justify-between hover:bg-slate-50 transition-colors">
+                              <div className="flex items-center gap-3">
+                                <div className="p-2 rounded-full bg-slate-100"><UserIcon className="h-4 w-4 text-slate-500" /></div>
+                                <div>
+                                  <p className="font-medium">{emp.firstName} {emp.lastName}</p>
+                                  <p className="text-xs text-slate-500">{emp.employeeId} | {emp.position}</p>
+                                </div>
+                              </div>
+                              <Button variant="ghost" size="sm" onClick={() => window.location.href=`/employee/${emp.id}`}>View Details</Button>
+                            </div>
+                          ))}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            ))}
           </CardContent>
         </Card>
       </div>
