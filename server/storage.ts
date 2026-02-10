@@ -189,22 +189,25 @@ export class MemStorage implements IStorage {
       name: "Human Resources", 
       description: "Manages employee relations, hiring, and company policies",
       unitId: 1
-    });
+    } as any);
     this.createDepartment({ 
       code: "ENG",
       name: "Engineering", 
-      description: "Software development and technical operations" 
-    });
+      description: "Software development and technical operations",
+      unitId: 1
+    } as any);
     this.createDepartment({ 
       code: "MKT",
       name: "Marketing", 
-      description: "Handles brand awareness and promotional activities" 
-    });
+      description: "Handles brand awareness and promotional activities",
+      unitId: 1
+    } as any);
     this.createDepartment({ 
       code: "FIN",
       name: "Finance", 
-      description: "Manages financial planning and accounting" 
-    });
+      description: "Manages financial planning and accounting",
+      unitId: 1
+    } as any);
     
     // Initialize with users for each role with pre-hashed passwords
     // Passwords are hashed in the same format as hashPassword in auth.ts
@@ -231,7 +234,6 @@ export class MemStorage implements IStorage {
       phoneNumber: "123-456-7890",
       address: "123 Main St, Anytown, USA",
       bankAccountNumber: null,
-      bankAccountHolderName: null,
       bankName: null,
       bankIFSCCode: null,
       bankAccountType: null,
@@ -272,7 +274,6 @@ export class MemStorage implements IStorage {
       phoneNumber: "123-456-7891",
       address: "124 Main St, Anytown, USA",
       bankAccountNumber: null,
-      bankAccountHolderName: null,
       bankName: null,
       bankIFSCCode: null,
       bankAccountType: null,
@@ -313,7 +314,6 @@ export class MemStorage implements IStorage {
       phoneNumber: "123-456-7892",
       address: "125 Main St, Anytown, USA",
       bankAccountNumber: null,
-      bankAccountHolderName: null,
       bankName: null,
       bankIFSCCode: null,
       bankAccountType: null,
@@ -354,7 +354,6 @@ export class MemStorage implements IStorage {
       phoneNumber: "123-456-7893",
       address: "126 Main St, Anytown, USA",
       bankAccountNumber: null,
-      bankAccountHolderName: null,
       bankName: null,
       bankIFSCCode: null,
       bankAccountType: null,
@@ -395,7 +394,6 @@ export class MemStorage implements IStorage {
       phoneNumber: "123-456-7894",
       address: "127 Main St, Anytown, USA",
       bankAccountNumber: null,
-      bankAccountHolderName: null,
       bankName: null,
       bankIFSCCode: null,
       bankAccountType: null,
@@ -577,7 +575,6 @@ export class MemStorage implements IStorage {
       maritalStatus: insertUser.maritalStatus ?? null,
       photoUrl: insertUser.photoUrl ?? null,
       bankAccountNumber: insertUser.bankAccountNumber ?? null,
-      bankAccountHolderName: insertUser.bankAccountHolderName ?? null,
       bankName: insertUser.bankName ?? null,
       bankIFSCCode: insertUser.bankIFSCCode ?? null,
       bankAccountType: (insertUser.bankAccountType as "savings" | "current" | "salary" | null) ?? null,

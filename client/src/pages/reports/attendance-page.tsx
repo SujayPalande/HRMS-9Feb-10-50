@@ -17,7 +17,8 @@ import { User, Department, Unit } from "@shared/schema";
 export default function AttendanceReportPage() {
   const [selectedMonth, setSelectedMonth] = useState("January 2025");
   const [selectedUnit, setSelectedUnit] = useState("all");
-  const [expandedDepts, setExpandedDepts] = useState<Set<number>>(new Set());
+  const [selectedDept, setSelectedDept] = useState("all");
+  const [expandedEmployees, setExpandedEmployees] = useState<Set<number>>(new Set());
   const [searchQuery, setSearchQuery] = useState("");
   const { toast } = useToast();
 
@@ -26,11 +27,11 @@ export default function AttendanceReportPage() {
   const { data: departments = [] } = useQuery<Department[]>({ queryKey: ["/api/departments"] });
   const { data: attendanceRecords = [] } = useQuery<any[]>({ queryKey: ["/api/attendance"] });
 
-  const toggleDept = (deptId: number) => {
-    const newSet = new Set(expandedDepts);
-    if (newSet.has(deptId)) newSet.delete(deptId);
-    else newSet.add(deptId);
-    setExpandedDepts(newSet);
+  const toggleEmployee = (empId: number) => {
+    const newSet = new Set(expandedEmployees);
+    if (newSet.has(empId)) newSet.delete(empId);
+    else newSet.add(empId);
+    setExpandedEmployees(newSet);
   };
 
   const getMonthData = (monthYear: string) => {
@@ -42,20 +43,24 @@ export default function AttendanceReportPage() {
   };
 
   const filteredDepartments = departments.filter(d => 
-    selectedUnit === "all" || d.unitId === parseInt(selectedUnit)
+    (selectedUnit === "all" || d.unitId === parseInt(selectedUnit)) &&
+    (selectedDept === "all" || d.id === parseInt(selectedDept))
   );
 
   const { startDate, endDate } = getMonthData(selectedMonth);
 
-  const getEmployeeAttendance = (userId: number) => {
-    const records = attendanceRecords.filter(r => {
+  const getDetailedAttendance = (userId: number) => {
+    const userRecords = attendanceRecords.filter(r => {
       const d = new Date(r.date);
       return r.userId === userId && d >= startDate && d <= endDate;
     });
-    const present = records.filter(r => r.status === 'present').length;
-    const absent = records.filter(r => r.status === 'absent').length;
-    const halfday = records.filter(r => r.status === 'halfday').length;
-    return { present, absent, halfday, total: records.length };
+    
+    const present = userRecords.filter(r => r.status === 'present').length;
+    const absent = userRecords.filter(r => r.status === 'absent').length;
+    const halfday = userRecords.filter(r => r.status === 'halfday').length;
+    const late = userRecords.filter(r => r.status === 'late').length;
+    
+    return { present, absent, halfday, late, total: userRecords.length };
   };
 
   const reportStats = [
@@ -140,7 +145,7 @@ export default function AttendanceReportPage() {
                 <SelectItem value="January 2025">January 2025</SelectItem>
               </SelectContent>
             </Select>
-            <Select value={selectedUnit} onValueChange={setSelectedUnit}>
+            <Select value={selectedUnit} onValueChange={(val) => { setSelectedUnit(val); setSelectedDept("all"); }}>
               <SelectTrigger className="w-40" data-testid="select-unit">
                 <Building2 className="h-4 w-4 mr-2" />
                 <SelectValue placeholder="Select Unit" />
@@ -148,6 +153,18 @@ export default function AttendanceReportPage() {
               <SelectContent>
                 <SelectItem value="all">All Units</SelectItem>
                 {units.map(u => <SelectItem key={u.id} value={u.id.toString()}>{u.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <Select value={selectedDept} onValueChange={setSelectedDept}>
+              <SelectTrigger className="w-40" data-testid="select-dept">
+                <Users className="h-4 w-4 mr-2" />
+                <SelectValue placeholder="Select Dept" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Departments</SelectItem>
+                {departments.filter(d => selectedUnit === "all" || d.unitId === parseInt(selectedUnit)).map(d => (
+                  <SelectItem key={d.id} value={d.id.toString()}>{d.name}</SelectItem>
+                ))}
               </SelectContent>
             </Select>
             <Button variant="outline" className="gap-2" onClick={handleExportPDF}>
@@ -194,54 +211,89 @@ export default function AttendanceReportPage() {
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
-            {filteredDepartments.map((dept) => (
-              <div key={dept.id} className="border rounded-lg overflow-hidden">
-                <button
-                  onClick={() => toggleDept(dept.id)}
-                  className="w-full flex items-center justify-between p-4 bg-slate-50 hover:bg-slate-100 transition-colors"
-                >
-                  <div className="flex items-center gap-3">
-                    {expandedDepts.has(dept.id) ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                    <span className="font-semibold text-slate-700">{dept.name}</span>
-                    <Badge variant="secondary" className="ml-2">
-                      {employees.filter(e => e.departmentId === dept.id).length} Employees
-                    </Badge>
+            {filteredDepartments.map((dept) => {
+              const deptEmployees = employees.filter(e => e.departmentId === dept.id);
+              
+              return (
+                <div key={dept.id} className="border rounded-lg overflow-hidden">
+                  <div className="w-full flex items-center justify-between p-4 bg-slate-50 border-b">
+                    <div className="flex items-center gap-3">
+                      <ChevronDown className="h-4 w-4" />
+                      <span className="font-semibold text-slate-700">{dept.name}</span>
+                      <Badge variant="secondary" className="ml-2">
+                        {deptEmployees.length} Employees
+                      </Badge>
+                    </div>
                   </div>
-                </button>
-                <AnimatePresence>
-                  {expandedDepts.has(dept.id) && (
-                    <motion.div
-                      initial={{ height: 0 }}
-                      animate={{ height: "auto" }}
-                      exit={{ height: 0 }}
-                      className="overflow-hidden"
-                    >
-                      <div className="p-2 bg-white divide-y">
-                        {employees
-                          .filter(e => e.departmentId === dept.id && (e.firstName.toLowerCase().includes(searchQuery.toLowerCase()) || e.lastName.toLowerCase().includes(searchQuery.toLowerCase())))
-                          .map(emp => (
-                            <div key={emp.id} className="p-3 flex items-center justify-between hover:bg-slate-50 transition-colors">
+                  <div className="p-2 bg-white divide-y">
+                    {deptEmployees
+                      .filter(e => e.firstName.toLowerCase().includes(searchQuery.toLowerCase()) || e.lastName.toLowerCase().includes(searchQuery.toLowerCase()))
+                      .map(emp => {
+                        const stats = getDetailedAttendance(emp.id);
+                        const isExpanded = expandedEmployees.has(emp.id);
+                        
+                        return (
+                          <div key={emp.id} className="flex flex-col">
+                            <button
+                              onClick={() => toggleEmployee(emp.id)}
+                              className="p-3 flex items-center justify-between hover:bg-slate-50 transition-colors w-full text-left"
+                            >
                               <div className="flex items-center gap-3">
-                                <div className="p-2 rounded-full bg-slate-100"><UserIcon className="h-4 w-4 text-slate-500" /></div>
+                                <div className="p-2 rounded-full bg-slate-100">
+                                  {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                                </div>
                                 <div>
                                   <p className="font-medium">{emp.firstName} {emp.lastName}</p>
                                   <p className="text-xs text-slate-500">{emp.employeeId} | {emp.position}</p>
-                                  <div className="flex items-center gap-2 mt-1">
-                                    <Badge variant="outline" className="text-[10px] h-4">Present: {getEmployeeAttendance(emp.id).present}</Badge>
-                                    <Badge variant="outline" className="text-[10px] h-4 text-red-600 border-red-200">Absent: {getEmployeeAttendance(emp.id).absent}</Badge>
-                                    <Badge variant="outline" className="text-[10px] h-4 text-yellow-600 border-yellow-200">Half Day: {getEmployeeAttendance(emp.id).halfday}</Badge>
-                                  </div>
                                 </div>
                               </div>
-                              <Button variant="ghost" size="sm" onClick={() => window.location.href=`/employee/${emp.id}`}>View Details</Button>
-                            </div>
-                          ))}
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-            ))}
+                              <div className="flex gap-2">
+                                <Badge variant="outline" className="text-green-600 bg-green-50">Present: {stats.present}</Badge>
+                                <Badge variant="outline" className="text-red-600 bg-red-50">Absent: {stats.absent}</Badge>
+                              </div>
+                            </button>
+                            
+                            <AnimatePresence>
+                              {isExpanded && (
+                                <motion.div
+                                  initial={{ height: 0, opacity: 0 }}
+                                  animate={{ height: "auto", opacity: 1 }}
+                                  exit={{ height: 0, opacity: 0 }}
+                                  className="bg-slate-50/50 p-4 border-t"
+                                >
+                                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                    <div className="bg-white p-3 rounded border">
+                                      <p className="text-xs text-slate-500 uppercase font-semibold">Present Days</p>
+                                      <p className="text-lg font-bold text-green-600">{stats.present}</p>
+                                    </div>
+                                    <div className="bg-white p-3 rounded border">
+                                      <p className="text-xs text-slate-500 uppercase font-semibold">Absent Days</p>
+                                      <p className="text-lg font-bold text-red-600">{stats.absent}</p>
+                                    </div>
+                                    <div className="bg-white p-3 rounded border">
+                                      <p className="text-xs text-slate-500 uppercase font-semibold">Half Days</p>
+                                      <p className="text-lg font-bold text-yellow-600">{stats.halfday}</p>
+                                    </div>
+                                    <div className="bg-white p-3 rounded border">
+                                      <p className="text-xs text-slate-500 uppercase font-semibold">Late Arrivals</p>
+                                      <p className="text-lg font-bold text-orange-600">{stats.late}</p>
+                                    </div>
+                                  </div>
+                                  <div className="mt-4 flex justify-end">
+                                    <Button variant="outline" size="sm" onClick={() => window.location.href=`/employee/${emp.id}`}>
+                                      View Detailed Attendance Log
+                                    </Button>
+                                  </div>
+                                </motion.div>
+                              )}
+                            </AnimatePresence>
+                          </div>
+                        );
+                      })}
+                  </div>
+                </div>
+              );
+            })}
           </CardContent>
         </Card>
       </div>

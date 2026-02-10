@@ -16,7 +16,8 @@ import { User, Department, Unit } from "@shared/schema";
 export default function LeaveReportPage() {
   const [selectedMonth, setSelectedMonth] = useState("January 2025");
   const [selectedUnit, setSelectedUnit] = useState("all");
-  const [expandedDepts, setExpandedDepts] = useState<Set<number>>(new Set());
+  const [selectedDept, setSelectedDept] = useState("all");
+  const [expandedEmployees, setExpandedEmployees] = useState<Set<number>>(new Set());
   const [searchQuery, setSearchQuery] = useState("");
   const { toast } = useToast();
 
@@ -25,11 +26,11 @@ export default function LeaveReportPage() {
   const { data: departments = [] } = useQuery<Department[]>({ queryKey: ["/api/departments"] });
   const { data: leaveRequests = [] } = useQuery<any[]>({ queryKey: ["/api/leave-requests"] });
 
-  const toggleDept = (deptId: number) => {
-    const newSet = new Set(expandedDepts);
-    if (newSet.has(deptId)) newSet.delete(deptId);
-    else newSet.add(deptId);
-    setExpandedDepts(newSet);
+  const toggleEmployee = (empId: number) => {
+    const newSet = new Set(expandedEmployees);
+    if (newSet.has(empId)) newSet.delete(empId);
+    else newSet.add(empId);
+    setExpandedEmployees(newSet);
   };
 
   const getMonthData = (monthYear: string) => {
@@ -41,17 +42,31 @@ export default function LeaveReportPage() {
   };
 
   const filteredDepartments = departments.filter(d => 
-    selectedUnit === "all" || d.unitId === parseInt(selectedUnit)
+    (selectedUnit === "all" || d.unitId === parseInt(selectedUnit)) &&
+    (selectedDept === "all" || d.id === parseInt(selectedDept))
   );
 
   const { startDate, endDate } = getMonthData(selectedMonth);
 
-  const getEmployeeLeaves = (userId: number) => {
-    const records = leaveRequests.filter(r => {
-      const start = new Date(r.startDate);
-      return r.userId === userId && start >= startDate && start <= endDate && r.status === 'approved';
-    });
-    return records.length;
+  const getDetailedLeaveStats = (userId: number) => {
+    const userLeaves = leaveRequests.filter(r => r.userId === userId);
+    const approved = userLeaves.filter(r => r.status === 'approved');
+    const pending = userLeaves.filter(r => r.status === 'pending');
+    const rejected = userLeaves.filter(r => r.status === 'rejected');
+    
+    return {
+      total: userLeaves.length,
+      approved: approved.length,
+      pending: pending.length,
+      rejected: rejected.length,
+      accrued: 24, // Mock accrued
+      remaining: 24 - approved.length,
+      byType: {
+        annual: approved.filter(r => r.type === 'annual').length,
+        sick: approved.filter(r => r.type === 'sick').length,
+        personal: approved.filter(r => r.type === 'personal').length,
+      }
+    };
   };
 
   const leaveStats = [
@@ -133,7 +148,7 @@ export default function LeaveReportPage() {
                 <SelectItem value="January 2025">January 2025</SelectItem>
               </SelectContent>
             </Select>
-            <Select value={selectedUnit} onValueChange={setSelectedUnit}>
+            <Select value={selectedUnit} onValueChange={(val) => { setSelectedUnit(val); setSelectedDept("all"); }}>
               <SelectTrigger className="w-40" data-testid="select-unit">
                 <Building2 className="h-4 w-4 mr-2" />
                 <SelectValue placeholder="Select Unit" />
@@ -141,6 +156,18 @@ export default function LeaveReportPage() {
               <SelectContent>
                 <SelectItem value="all">All Units</SelectItem>
                 {units.map(u => <SelectItem key={u.id} value={u.id.toString()}>{u.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <Select value={selectedDept} onValueChange={setSelectedDept}>
+              <SelectTrigger className="w-40" data-testid="select-dept">
+                <Users className="h-4 w-4 mr-2" />
+                <SelectValue placeholder="Select Dept" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Departments</SelectItem>
+                {departments.filter(d => selectedUnit === "all" || d.unitId === parseInt(selectedUnit)).map(d => (
+                  <SelectItem key={d.id} value={d.id.toString()}>{d.name}</SelectItem>
+                ))}
               </SelectContent>
             </Select>
             <Button variant="outline" className="gap-2" onClick={handleExportPDF}>
@@ -187,52 +214,113 @@ export default function LeaveReportPage() {
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
-            {filteredDepartments.map((dept) => (
-              <div key={dept.id} className="border rounded-lg overflow-hidden">
-                <button
-                  onClick={() => toggleDept(dept.id)}
-                  className="w-full flex items-center justify-between p-4 bg-slate-50 hover:bg-slate-100 transition-colors"
-                >
-                  <div className="flex items-center gap-3">
-                    {expandedDepts.has(dept.id) ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                    <span className="font-semibold text-slate-700">{dept.name}</span>
-                    <Badge variant="secondary" className="ml-2">
-                      {employees.filter(e => e.departmentId === dept.id).length} Employees
-                    </Badge>
+            {filteredDepartments.map((dept) => {
+              const deptEmployees = employees.filter(e => e.departmentId === dept.id);
+              const deptLeaves = leaveRequests.filter(r => deptEmployees.some(e => e.id === r.userId) && r.status === 'approved');
+              
+              return (
+                <div key={dept.id} className="border rounded-lg overflow-hidden">
+                  <div className="w-full flex items-center justify-between p-4 bg-slate-50 border-b">
+                    <div className="flex items-center gap-3">
+                      <ChevronDown className="h-4 w-4" />
+                      <span className="font-semibold text-slate-700">{dept.name}</span>
+                      <Badge variant="secondary" className="ml-2">
+                        {deptEmployees.length} Employees
+                      </Badge>
+                      <Badge variant="outline" className="ml-2">
+                        {deptLeaves.length} Total Approved Leaves
+                      </Badge>
+                    </div>
                   </div>
-                </button>
-                <AnimatePresence>
-                  {expandedDepts.has(dept.id) && (
-                    <motion.div
-                      initial={{ height: 0 }}
-                      animate={{ height: "auto" }}
-                      exit={{ height: 0 }}
-                      className="overflow-hidden"
-                    >
-                      <div className="p-2 bg-white divide-y">
-                        {employees
-                          .filter(e => e.departmentId === dept.id && (e.firstName.toLowerCase().includes(searchQuery.toLowerCase()) || e.lastName.toLowerCase().includes(searchQuery.toLowerCase())))
-                          .map(emp => (
-                            <div key={emp.id} className="p-3 flex items-center justify-between hover:bg-slate-50 transition-colors">
+                  <div className="p-2 bg-white divide-y">
+                    {deptEmployees
+                      .filter(e => e.firstName.toLowerCase().includes(searchQuery.toLowerCase()) || e.lastName.toLowerCase().includes(searchQuery.toLowerCase()))
+                      .map(emp => {
+                        const stats = getDetailedLeaveStats(emp.id);
+                        const isExpanded = expandedEmployees.has(emp.id);
+                        
+                        return (
+                          <div key={emp.id} className="flex flex-col">
+                            <button
+                              onClick={() => toggleEmployee(emp.id)}
+                              className="p-3 flex items-center justify-between hover:bg-slate-50 transition-colors w-full text-left"
+                            >
                               <div className="flex items-center gap-3">
-                                <div className="p-2 rounded-full bg-slate-100"><UserIcon className="h-4 w-4 text-slate-500" /></div>
+                                <div className="p-2 rounded-full bg-slate-100">
+                                  {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                                </div>
                                 <div>
                                   <p className="font-medium">{emp.firstName} {emp.lastName}</p>
-                                  <div className="flex items-center gap-2 mt-1">
-                                    <Badge variant="outline" className="text-[10px] h-4">Approved Leaves: {getEmployeeLeaves(emp.id)}</Badge>
-                                  </div>
-                                  <p className="text-xs text-slate-500 mt-1">{emp.employeeId} | {emp.position}</p>
+                                  <p className="text-xs text-slate-500">{emp.employeeId} | {emp.position}</p>
                                 </div>
                               </div>
-                              <Button variant="ghost" size="sm" onClick={() => window.location.href=`/employee/${emp.id}`}>View Details</Button>
-                            </div>
-                          ))}
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-            ))}
+                              <div className="flex gap-2">
+                                <Badge variant="outline" className="text-green-600 bg-green-50">Used: {stats.approved}</Badge>
+                                <Badge variant="outline" className="text-blue-600 bg-blue-50">Remaining: {stats.remaining}</Badge>
+                              </div>
+                            </button>
+                            
+                            <AnimatePresence>
+                              {isExpanded && (
+                                <motion.div
+                                  initial={{ height: 0, opacity: 0 }}
+                                  animate={{ height: "auto", opacity: 1 }}
+                                  exit={{ height: 0, opacity: 0 }}
+                                  className="bg-slate-50/50 p-4 border-t"
+                                >
+                                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                                    <div className="bg-white p-3 rounded border">
+                                      <p className="text-xs text-slate-500 uppercase font-semibold">Accrued</p>
+                                      <p className="text-lg font-bold">{stats.accrued}</p>
+                                    </div>
+                                    <div className="bg-white p-3 rounded border text-green-600">
+                                      <p className="text-xs text-slate-500 uppercase font-semibold">Approved</p>
+                                      <p className="text-lg font-bold">{stats.approved}</p>
+                                    </div>
+                                    <div className="bg-white p-3 rounded border text-yellow-600">
+                                      <p className="text-xs text-slate-500 uppercase font-semibold">Pending</p>
+                                      <p className="text-lg font-bold">{stats.pending}</p>
+                                    </div>
+                                    <div className="bg-white p-3 rounded border text-red-600">
+                                      <p className="text-xs text-slate-500 uppercase font-semibold">Rejected</p>
+                                      <p className="text-lg font-bold">{stats.rejected}</p>
+                                    </div>
+                                  </div>
+                                  
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                    <div>
+                                      <h4 className="text-sm font-semibold mb-2">Leave Types (Approved)</h4>
+                                      <div className="space-y-2">
+                                        <div className="flex justify-between text-sm">
+                                          <span>Annual Leave</span>
+                                          <span className="font-medium">{stats.byType.annual}</span>
+                                        </div>
+                                        <div className="flex justify-between text-sm">
+                                          <span>Sick Leave</span>
+                                          <span className="font-medium">{stats.byType.sick}</span>
+                                        </div>
+                                        <div className="flex justify-between text-sm">
+                                          <span>Personal Leave</span>
+                                          <span className="font-medium">{stats.byType.personal}</span>
+                                        </div>
+                                      </div>
+                                    </div>
+                                    <div className="flex items-end justify-end">
+                                      <Button variant="outline" size="sm" onClick={() => window.location.href=`/employee/${emp.id}`}>
+                                        Full Profile History
+                                      </Button>
+                                    </div>
+                                  </div>
+                                </motion.div>
+                              )}
+                            </AnimatePresence>
+                          </div>
+                        );
+                      })}
+                  </div>
+                </div>
+              );
+            })}
           </CardContent>
         </Card>
       </div>

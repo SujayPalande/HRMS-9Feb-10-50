@@ -123,7 +123,6 @@ export const insertUserSchema = createInsertSchema(users).pick({
   phoneNumber: true,
   address: true,
   bankAccountNumber: true,
-  bankAccountHolderName: true,
   bankName: true,
   bankIFSCCode: true,
   bankAccountType: true,

@@ -11,26 +11,45 @@ import { useToast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query";
 import jsPDF from "jspdf";
 import { addCompanyHeader, addWatermark, addHRSignature, addFooter, addDocumentDate, generateReferenceNumber, addReferenceNumber } from "@/lib/pdf-utils";
-import { User, Department } from "@shared/schema";
+import { User, Department, Unit } from "@shared/schema";
 
 export default function HeadcountReportPage() {
   const [selectedMonth, setSelectedMonth] = useState("January 2025");
   const [selectedUnit, setSelectedUnit] = useState("all");
-  const [expandedDepts, setExpandedDepts] = useState<Set<number>>(new Set());
+  const [selectedDept, setSelectedDept] = useState("all");
+  const [expandedEmployees, setExpandedEmployees] = useState<Set<number>>(new Set());
   const [searchQuery, setSearchQuery] = useState("");
   const { toast } = useToast();
 
+  const { data: units = [] } = useQuery<Unit[]>({ queryKey: ["/api/masters/units"] });
   const { data: employees = [] } = useQuery<User[]>({ queryKey: ["/api/employees"] });
   const { data: departments = [] } = useQuery<Department[]>({ queryKey: ["/api/departments"] });
 
-  const toggleDept = (deptId: number) => {
-    const newSet = new Set(expandedDepts);
-    if (newSet.has(deptId)) newSet.delete(deptId);
-    else newSet.add(deptId);
-    setExpandedDepts(newSet);
+  const toggleEmployee = (empId: number) => {
+    const newSet = new Set(expandedEmployees);
+    if (newSet.has(empId)) newSet.delete(empId);
+    else newSet.add(empId);
+    setExpandedEmployees(newSet);
   };
 
-  const units = ["Cybaemtech", "Other Unit"];
+  const filteredDepartments = departments.filter(d => 
+    (selectedUnit === "all" || d.unitId === parseInt(selectedUnit)) &&
+    (selectedDept === "all" || d.id === parseInt(selectedDept))
+  );
+
+  const getTenure = (joinDate: string | Date | null) => {
+    if (!joinDate) return "N/A";
+    const join = new Date(joinDate);
+    const now = new Date();
+    const diffTime = Math.abs(now.getTime() - join.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    if (diffDays < 30) return `${diffDays} days`;
+    const diffMonths = Math.floor(diffDays / 30);
+    if (diffMonths < 12) return `${diffMonths} months`;
+    const diffYears = Math.floor(diffMonths / 12);
+    const remainingMonths = diffMonths % 12;
+    return `${diffYears}y ${remainingMonths}m`;
+  };
 
   const headcountStats = [
     { title: "Total Headcount", value: employees.length.toString(), icon: <Users className="h-5 w-5" />, color: "bg-teal-50 text-teal-600" },
@@ -89,14 +108,26 @@ export default function HeadcountReportPage() {
                 <SelectItem value="January 2025">January 2025</SelectItem>
               </SelectContent>
             </Select>
-            <Select value={selectedUnit} onValueChange={setSelectedUnit}>
+            <Select value={selectedUnit} onValueChange={(val) => { setSelectedUnit(val); setSelectedDept("all"); }}>
               <SelectTrigger className="w-40" data-testid="select-unit">
                 <Building2 className="h-4 w-4 mr-2" />
                 <SelectValue placeholder="Select Unit" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Units</SelectItem>
-                {units.map(u => <SelectItem key={u} value={u.toLowerCase()}>{u}</SelectItem>)}
+                {units.map(u => <SelectItem key={u.id} value={u.id.toString()}>{u.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <Select value={selectedDept} onValueChange={setSelectedDept}>
+              <SelectTrigger className="w-40" data-testid="select-dept">
+                <Users className="h-4 w-4 mr-2" />
+                <SelectValue placeholder="Select Dept" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Departments</SelectItem>
+                {departments.filter(d => selectedUnit === "all" || d.unitId === parseInt(selectedUnit)).map(d => (
+                  <SelectItem key={d.id} value={d.id.toString()}>{d.name}</SelectItem>
+                ))}
               </SelectContent>
             </Select>
             <Button variant="outline" className="gap-2" onClick={handleExportPDF}>
@@ -143,49 +174,102 @@ export default function HeadcountReportPage() {
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
-            {departments.map((dept) => (
-              <div key={dept.id} className="border rounded-lg overflow-hidden">
-                <button
-                  onClick={() => toggleDept(dept.id)}
-                  className="w-full flex items-center justify-between p-4 bg-slate-50 hover:bg-slate-100 transition-colors"
-                >
-                  <div className="flex items-center gap-3">
-                    {expandedDepts.has(dept.id) ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                    <span className="font-semibold text-slate-700">{dept.name}</span>
-                    <Badge variant="secondary" className="ml-2">
-                      {employees.filter(e => e.departmentId === dept.id).length} Employees
-                    </Badge>
+            {filteredDepartments.map((dept) => {
+              const deptEmployees = employees.filter(e => e.departmentId === dept.id);
+              
+              return (
+                <div key={dept.id} className="border rounded-lg overflow-hidden">
+                  <div className="w-full flex items-center justify-between p-4 bg-slate-50 border-b">
+                    <div className="flex items-center gap-3">
+                      <ChevronDown className="h-4 w-4" />
+                      <span className="font-semibold text-slate-700">{dept.name}</span>
+                      <Badge variant="secondary" className="ml-2">
+                        {deptEmployees.length} Employees
+                      </Badge>
+                    </div>
                   </div>
-                </button>
-                <AnimatePresence>
-                  {expandedDepts.has(dept.id) && (
-                    <motion.div
-                      initial={{ height: 0 }}
-                      animate={{ height: "auto" }}
-                      exit={{ height: 0 }}
-                      className="overflow-hidden"
-                    >
-                      <div className="p-2 bg-white divide-y">
-                        {employees
-                          .filter(e => e.departmentId === dept.id && (e.firstName.toLowerCase().includes(searchQuery.toLowerCase()) || e.lastName.toLowerCase().includes(searchQuery.toLowerCase())))
-                          .map(emp => (
-                            <div key={emp.id} className="p-3 flex items-center justify-between hover:bg-slate-50 transition-colors">
+                  <div className="p-2 bg-white divide-y">
+                    {deptEmployees
+                      .filter(e => e.firstName.toLowerCase().includes(searchQuery.toLowerCase()) || e.lastName.toLowerCase().includes(searchQuery.toLowerCase()))
+                      .map(emp => {
+                        const isExpanded = expandedEmployees.has(emp.id);
+                        
+                        return (
+                          <div key={emp.id} className="flex flex-col">
+                            <button
+                              onClick={() => toggleEmployee(emp.id)}
+                              className="p-3 flex items-center justify-between hover:bg-slate-50 transition-colors w-full text-left"
+                            >
                               <div className="flex items-center gap-3">
-                                <div className="p-2 rounded-full bg-slate-100"><UserIcon className="h-4 w-4 text-slate-500" /></div>
+                                <div className="p-2 rounded-full bg-slate-100">
+                                  {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                                </div>
                                 <div>
                                   <p className="font-medium">{emp.firstName} {emp.lastName}</p>
                                   <p className="text-xs text-slate-500">{emp.employeeId} | {emp.position}</p>
                                 </div>
                               </div>
-                              <Button variant="ghost" size="sm" onClick={() => window.location.href=`/employee/${emp.id}`}>View Details</Button>
-                            </div>
-                          ))}
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-            ))}
+                              <div className="flex gap-2">
+                                <Badge variant="outline" className="text-teal-600 bg-teal-50">Active</Badge>
+                                <Badge variant="outline">{emp.employmentType}</Badge>
+                              </div>
+                            </button>
+                            
+                            <AnimatePresence>
+                              {isExpanded && (
+                                <motion.div
+                                  initial={{ height: 0, opacity: 0 }}
+                                  animate={{ height: "auto", opacity: 1 }}
+                                  exit={{ height: 0, opacity: 0 }}
+                                  className="bg-slate-50/50 p-4 border-t"
+                                >
+                                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                    <div className="space-y-3">
+                                      <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Employment Details</h4>
+                                      <div className="space-y-1">
+                                        <p className="text-sm flex justify-between">
+                                          <span className="text-slate-500">Join Date:</span>
+                                          <span className="font-medium">{emp.joinDate ? new Date(emp.joinDate).toLocaleDateString() : 'N/A'}</span>
+                                        </p>
+                                        <p className="text-sm flex justify-between">
+                                          <span className="text-slate-500">Tenure:</span>
+                                          <span className="font-medium">{getTenure(emp.joinDate)}</span>
+                                        </p>
+                                        <p className="text-sm flex justify-between">
+                                          <span className="text-slate-500">Type:</span>
+                                          <span className="font-medium capitalize">{emp.employmentType}</span>
+                                        </p>
+                                      </div>
+                                    </div>
+                                    <div className="space-y-3">
+                                      <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Position info</h4>
+                                      <div className="space-y-1">
+                                        <p className="text-sm flex justify-between">
+                                          <span className="text-slate-500">Role:</span>
+                                          <span className="font-medium capitalize">{emp.role}</span>
+                                        </p>
+                                        <p className="text-sm flex justify-between">
+                                          <span className="text-slate-500">Work Location:</span>
+                                          <span className="font-medium">{emp.workLocation || 'Office'}</span>
+                                        </p>
+                                      </div>
+                                    </div>
+                                    <div className="flex items-end justify-end">
+                                      <Button variant="outline" size="sm" onClick={() => window.location.href=`/employee/${emp.id}`}>
+                                        View Full Employee Profile
+                                      </Button>
+                                    </div>
+                                  </div>
+                                </motion.div>
+                              )}
+                            </AnimatePresence>
+                          </div>
+                        );
+                      })}
+                  </div>
+                </div>
+              );
+            })}
           </CardContent>
         </Card>
       </div>
