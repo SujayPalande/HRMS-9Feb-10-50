@@ -25,7 +25,11 @@ import EmployeeDetailPage from "@/pages/employee-detail-page";
 import DocumentsPage from "@/pages/documents-page";
 import ShiftsPage from "@/pages/shifts-page";
 
-import PfEsiPtPage from "@/pages/compliance/pf-esi-pt-page";
+import PfPage from "@/pages/compliance/pf-page";
+import EsiPage from "@/pages/compliance/esi-page";
+import PtPage from "@/pages/compliance/pt-page";
+import MlwfPage from "@/pages/compliance/mlwf-page";
+import BonusReportsPage from "@/pages/compliance/bonus-reports-page";
 import Form16TdsPage from "@/pages/compliance/form16-tds-page";
 import StatutoryCompliancePage from "@/pages/compliance/statutory-compliance-page";
 
@@ -72,7 +76,6 @@ import LeaveReportPage from "@/pages/reports/leave-page";
 import PayrollReportPage from "@/pages/reports/payroll-page";
 import MusterRollPage from "@/pages/reports/muster-roll-page";
 import LeaveRegisterPage from "@/pages/reports/leave-register-page";
-import MusterRollCombinedPage from "@/pages/reports/muster-roll-combined-page";
 
 import MasterDataPage from "@/pages/master-data-page";
 import BankMasterPage from "@/pages/masters/bank-master-page";
@@ -134,7 +137,11 @@ function AppRouter() {
       <ProtectedRoute path="/payroll/payslips" component={PayslipsPage} />
       <ProtectedRoute path="/payroll/transfers" component={BankTransfersPage} />
             
-      <ProtectedRoute path="/compliance/pf-esi-pt" component={PfEsiPtPage} />
+      <ProtectedRoute path="/compliance/pf" component={PfPage} />
+      <ProtectedRoute path="/compliance/esi" component={EsiPage} />
+      <ProtectedRoute path="/compliance/pt" component={PtPage} />
+      <ProtectedRoute path="/compliance/mlwf" component={MlwfPage} />
+      <ProtectedRoute path="/compliance/bonus-reports" component={BonusReportsPage} />
       <ProtectedRoute path="/compliance/form16-tds" component={Form16TdsPage} />
       <ProtectedRoute path="/compliance/statutory" component={StatutoryCompliancePage} />
       

@@ -10,7 +10,7 @@ import {
   UserCheck, BarChart3, Wallet, Receipt, TrendingUp, Award,
   BookOpen, Calendar, ClipboardList, FileCheck, Truck, Box,
   FileSignature, AlertTriangle, Calculator, FileArchive, Download,
-  ShieldAlert, Settings2, Play
+  ShieldAlert, Settings2, Play, Shield
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -275,8 +275,11 @@ export function Sidebar({ className }: SidebarProps) {
         { title: "Muster Roll - Form II", href: "/reports/muster-roll", icon: <ClipboardList className="h-4 w-4" />, permissions: ["reports.view"] },
         { title: "Leave Register - Form 20", href: "/reports/leave-register", icon: <BookOpen className="h-4 w-4" />, permissions: ["reports.view"] },
         { title: "Headcount Report", href: "/reports/headcount", icon: <Users className="h-4 w-4" />, permissions: ["reports.view"] },
-        { title: "PF/ESI/PT", href: "/compliance/pf-esi-pt", icon: <Calculator className="h-4 w-4" />, permissions: ["payroll.view"] },
-        { title: "PF/ESI/Bonus Reports", href: "/compliance/statutory", icon: <FileSpreadsheet className="h-4 w-4" />, permissions: ["payroll.view"] },
+        { title: "PF", href: "/compliance/pf", icon: <Shield className="h-4 w-4" />, permissions: ["payroll.view"] },
+        { title: "ESI", href: "/compliance/esi", icon: <Building2 className="h-4 w-4" />, permissions: ["payroll.view"] },
+        { title: "PT", href: "/compliance/pt", icon: <Calculator className="h-4 w-4" />, permissions: ["payroll.view"] },
+        { title: "MLWF", href: "/compliance/mlwf", icon: <Shield className="h-4 w-4" />, permissions: ["payroll.view"] },
+        { title: "Bonus Reports", href: "/compliance/bonus-reports", icon: <FileSpreadsheet className="h-4 w-4" />, permissions: ["payroll.view"] },
         { title: "Form 16", href: "/compliance/form16-tds", icon: <FileText className="h-4 w-4" />, permissions: ["payroll.view"] }
       ]
     }
