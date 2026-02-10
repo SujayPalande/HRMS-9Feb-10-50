@@ -91,49 +91,56 @@ export default function AttendanceReportPage() {
   ];
 
   const handleExportPDF = () => {
-    const doc = new jsPDF({ orientation: 'landscape' });
-    addWatermark(doc);
-    addCompanyHeader(doc, { 
-      title: "UNIT-WISE ATTENDANCE REPORT", 
-      subtitle: `Period: ${selectedMonth} | Unit: ${selectedUnit === 'all' ? 'All Units' : units.find(u => u.id === parseInt(selectedUnit))?.name}` 
-    });
-    
-    const tableData = employees
-      .filter(emp => {
-        const dept = departments.find(d => d.id === emp.departmentId);
-        const matchesUnit = selectedUnit === 'all' || (dept && dept.unitId === parseInt(selectedUnit));
-        const matchesSearch = searchQuery === "" || 
-          `${emp.firstName} ${emp.lastName}`.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          (emp.employeeId || "").toLowerCase().includes(searchQuery.toLowerCase());
-        return matchesUnit && matchesSearch;
-      })
-      .map(emp => {
-        const stats = getDetailedAttendance(emp.id);
-        return [
-          emp.employeeId || '-',
-          `${emp.firstName} ${emp.lastName}`,
-          departments.find(d => d.id === emp.departmentId)?.name || '-',
-          stats.present.toString(),
-          stats.absent.toString(),
-          stats.halfday.toString(),
-          stats.late.toString(),
-          (stats.present + stats.absent + stats.halfday).toString()
-        ];
+    try {
+      const doc = new jsPDF({ orientation: 'landscape' });
+      addWatermark(doc);
+      addCompanyHeader(doc, { 
+        title: "UNIT-WISE ATTENDANCE REPORT", 
+        subtitle: `Period: ${selectedMonth} | Unit: ${selectedUnit === 'all' ? 'All Units' : units.find(u => u.id === parseInt(selectedUnit))?.name}` 
+      });
+      
+      const tableData = employees
+        .filter(emp => {
+          const dept = departments.find(d => d.id === emp.departmentId);
+          const matchesUnit = selectedUnit === 'all' || (dept && dept.unitId === parseInt(selectedUnit));
+          const matchesSearch = searchQuery === "" || 
+            `${emp.firstName} ${emp.lastName}`.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            (emp.employeeId || "").toLowerCase().includes(searchQuery.toLowerCase());
+          return matchesUnit && matchesSearch;
+        })
+        .map(emp => {
+          const stats = getDetailedAttendance(emp.id);
+          return [
+            emp.employeeId || '-',
+            `${emp.firstName} ${emp.lastName}`,
+            departments.find(d => d.id === emp.departmentId)?.name || '-',
+            stats.present.toString(),
+            stats.absent.toString(),
+            stats.halfday.toString(),
+            stats.late.toString(),
+            (stats.present + stats.absent + stats.halfday).toString()
+          ];
+        });
+
+      (doc as any).autoTable({
+        head: [['Emp ID', 'Name', 'Department', 'Present', 'Absent', 'Half Day', 'Late', 'Total Days']],
+        body: tableData,
+        startY: 70,
+        headStyles: { fillStyle: 'F', fillColor: [15, 23, 42] },
+        alternateRowStyles: { fillColor: [245, 247, 250] },
+        margin: { top: 70 }
       });
 
-    (doc as any).autoTable({
-      head: [['Emp ID', 'Name', 'Department', 'Present', 'Absent', 'Half Day', 'Late', 'Total Days']],
-      body: tableData,
-      startY: 70,
-      headStyles: { fillStyle: 'F', fillColor: [15, 23, 42] }
-    });
-
-    addFooter(doc);
-    const refNumber = generateReferenceNumber("ATT");
-    addReferenceNumber(doc, refNumber, 68);
-    addDocumentDate(doc, undefined, 68);
-    doc.save(`attendance_report_${selectedMonth.replace(/\s+/g, '_')}.pdf`);
-    toast({ title: "PDF Exported Successfully" });
+      addFooter(doc);
+      const refNumber = generateReferenceNumber("ATT");
+      addReferenceNumber(doc, refNumber, 68);
+      addDocumentDate(doc, undefined, 68);
+      doc.save(`attendance_report_${selectedMonth.replace(/\s+/g, '_')}.pdf`);
+      toast({ title: "PDF Exported Successfully" });
+    } catch (error) {
+      console.error("PDF Export Error:", error);
+      toast({ title: "Export Failed", variant: "destructive" });
+    }
   };
 
   const handleExportExcel = () => {
@@ -188,10 +195,6 @@ export default function AttendanceReportPage() {
     toast({ title: "Text File Exported" });
   };
 
-  const handleSendMail = () => {
-    toast({ title: "Email Sent", description: "Attendance report has been sent to administrators." });
-  };
-
   return (
     <AppLayout>
       <div className="space-y-6">
@@ -201,10 +204,10 @@ export default function AttendanceReportPage() {
           className="flex flex-col md:flex-row md:items-center md:justify-between gap-4"
         >
           <div>
-            <h1 className="text-2xl font-bold text-slate-900" data-testid="text-page-title">Unit-wise Attendance Reports</h1>
+            <h1 className="text-2xl font-bold text-slate-900 dark:text-white" data-testid="text-page-title">Unit-wise Attendance Reports</h1>
             <p className="text-slate-500 mt-1">Hierarchical analysis: Unit &gt; Department &gt; Employee</p>
           </div>
-            <div className="flex gap-2 flex-wrap">
+          <div className="flex gap-2 flex-wrap">
             <Select value={selectedMonth} onValueChange={setSelectedMonth}>
               <SelectTrigger className="w-40 h-9" data-testid="select-month">
                 <Calendar className="h-4 w-4 mr-2" />
@@ -239,7 +242,7 @@ export default function AttendanceReportPage() {
                 <div className="flex items-center gap-4">
                   <div className={`p-3 rounded-lg ${stat.color}`}>{stat.icon}</div>
                   <div>
-                    <p className="text-2xl font-bold text-slate-900">{stat.value}</p>
+                    <p className="text-2xl font-bold text-slate-900 dark:text-white">{stat.value}</p>
                     <p className="text-sm text-slate-500">{stat.title}</p>
                   </div>
                 </div>
@@ -269,21 +272,25 @@ export default function AttendanceReportPage() {
           <CardContent className="space-y-4">
             {filteredDepartments.map((dept) => {
               const deptEmployees = employees.filter(e => e.departmentId === dept.id);
+              const deptAttendance = attendanceRecords.filter(r => deptEmployees.some(e => e.id === r.userId));
               
               return (
                 <div key={dept.id} className="border rounded-lg overflow-hidden">
-                  <div className="w-full flex items-center justify-between p-4 bg-slate-50 border-b">
+                  <div className="w-full flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-900 border-b">
                     <div className="flex items-center gap-3">
                       <ChevronDown className="h-4 w-4" />
-                      <span className="font-semibold text-slate-700">{dept.name}</span>
+                      <span className="font-semibold text-slate-700 dark:text-slate-200">{dept.name}</span>
                       <Badge variant="secondary" className="ml-2">
                         {deptEmployees.length} Employees
                       </Badge>
+                      <Badge variant="outline" className="ml-2">
+                        {deptAttendance.length} Total Records
+                      </Badge>
                     </div>
                   </div>
-                  <div className="p-2 bg-white divide-y">
+                  <div className="p-2 bg-white dark:bg-slate-950 divide-y">
                     {deptEmployees
-                      .filter(e => e.firstName.toLowerCase().includes(searchQuery.toLowerCase()) || e.lastName.toLowerCase().includes(searchQuery.toLowerCase()))
+                      .filter(e => e.firstName.toLowerCase().includes(searchQuery.toLowerCase()) || e.lastName.toLowerCase().includes(searchQuery.toLowerCase()) || (e.employeeId || "").toLowerCase().includes(searchQuery.toLowerCase()))
                       .map(emp => {
                         const stats = getDetailedAttendance(emp.id);
                         const isExpanded = expandedEmployees.has(emp.id);
@@ -292,10 +299,10 @@ export default function AttendanceReportPage() {
                           <div key={emp.id} className="flex flex-col">
                             <button
                               onClick={() => toggleEmployee(emp.id)}
-                              className="p-3 flex items-center justify-between hover:bg-slate-50 transition-colors w-full text-left"
+                              className="p-3 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors w-full text-left"
                             >
                               <div className="flex items-center gap-3">
-                                <div className="p-2 rounded-full bg-slate-100">
+                                <div className="p-2 rounded-full bg-slate-100 dark:bg-slate-800">
                                   {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                                 </div>
                                 <div>
@@ -304,8 +311,8 @@ export default function AttendanceReportPage() {
                                 </div>
                               </div>
                               <div className="flex gap-2">
-                                <Badge variant="outline" className="text-green-600 bg-green-50">Present: {stats.present}</Badge>
-                                <Badge variant="outline" className="text-red-600 bg-red-50">Absent: {stats.absent}</Badge>
+                                <Badge variant="outline" className="text-green-600 bg-green-50 dark:bg-green-950">Present: {stats.present}</Badge>
+                                <Badge variant="outline" className="text-red-600 bg-red-50 dark:bg-red-950">Absent: {stats.absent}</Badge>
                               </div>
                             </button>
                             
@@ -315,29 +322,30 @@ export default function AttendanceReportPage() {
                                   initial={{ height: 0, opacity: 0 }}
                                   animate={{ height: "auto", opacity: 1 }}
                                   exit={{ height: 0, opacity: 0 }}
-                                  className="bg-slate-50/50 p-4 border-t"
+                                  className="bg-slate-50/50 dark:bg-slate-900/50 p-4 border-t"
                                 >
-                                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                    <div className="bg-white p-3 rounded border">
-                                      <p className="text-xs text-slate-500 uppercase font-semibold">Present Days</p>
-                                      <p className="text-lg font-bold text-green-600">{stats.present}</p>
+                                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                                    <div className="bg-white dark:bg-slate-950 p-3 rounded border">
+                                      <p className="text-xs text-slate-500 uppercase font-semibold">Present</p>
+                                      <p className="text-lg font-bold">{stats.present}</p>
                                     </div>
-                                    <div className="bg-white p-3 rounded border">
-                                      <p className="text-xs text-slate-500 uppercase font-semibold">Absent Days</p>
-                                      <p className="text-lg font-bold text-red-600">{stats.absent}</p>
+                                    <div className="bg-white dark:bg-slate-950 p-3 rounded border">
+                                      <p className="text-xs text-slate-500 uppercase font-semibold">Absent</p>
+                                      <p className="text-lg font-bold">{stats.absent}</p>
                                     </div>
-                                    <div className="bg-white p-3 rounded border">
-                                      <p className="text-xs text-slate-500 uppercase font-semibold">Half Days</p>
-                                      <p className="text-lg font-bold text-yellow-600">{stats.halfday}</p>
+                                    <div className="bg-white dark:bg-slate-950 p-3 rounded border">
+                                      <p className="text-xs text-slate-500 uppercase font-semibold">Half Day</p>
+                                      <p className="text-lg font-bold">{stats.halfday}</p>
                                     </div>
-                                    <div className="bg-white p-3 rounded border">
-                                      <p className="text-xs text-slate-500 uppercase font-semibold">Late Arrivals</p>
-                                      <p className="text-lg font-bold text-orange-600">{stats.late}</p>
+                                    <div className="bg-white dark:bg-slate-950 p-3 rounded border">
+                                      <p className="text-xs text-slate-500 uppercase font-semibold">Late</p>
+                                      <p className="text-lg font-bold">{stats.late}</p>
                                     </div>
                                   </div>
-                                  <div className="mt-4 flex justify-end">
-                                    <Button variant="outline" size="sm" onClick={() => window.location.href=`/employee/${emp.id}`}>
-                                      View Detailed Attendance Log
+                                  
+                                  <div className="flex justify-end gap-2">
+                                    <Button variant="outline" size="sm" onClick={() => window.location.href=`/attendance/history?id=${emp.id}`}>
+                                      View Full History
                                     </Button>
                                   </div>
                                 </motion.div>

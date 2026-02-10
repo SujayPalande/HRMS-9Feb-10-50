@@ -77,41 +77,51 @@ export default function HeadcountReportPage() {
   ];
 
   const handleExportPDF = () => {
-    const doc = new jsPDF();
-    addWatermark(doc);
-    addCompanyHeader(doc, { 
-      title: "UNIT-WISE HEADCOUNT REPORT", 
-      subtitle: `Period: ${selectedMonth} | Unit: ${selectedUnit === 'all' ? 'All Units' : units.find(u => u.id === parseInt(selectedUnit))?.name}` 
-    });
-    
-    const tableData = employees
-      .filter(emp => {
-        const dept = departments.find(d => d.id === emp.departmentId);
-        const matchesUnit = selectedUnit === 'all' || (dept && dept.unitId === parseInt(selectedUnit));
-        return matchesUnit;
-      })
-      .map(emp => [
-        emp.employeeId || '-',
-        `${emp.firstName} ${emp.lastName}`,
-        departments.find(d => d.id === emp.departmentId)?.name || '-',
-        emp.position || '-',
-        emp.joinDate ? new Date(emp.joinDate).toLocaleDateString() : 'N/A',
-        emp.employmentType || '-'
-      ]);
+    try {
+      const doc = new jsPDF();
+      addWatermark(doc);
+      addCompanyHeader(doc, { 
+        title: "UNIT-WISE HEADCOUNT REPORT", 
+        subtitle: `Period: ${selectedMonth} | Unit: ${selectedUnit === 'all' ? 'All Units' : units.find(u => u.id === parseInt(selectedUnit))?.name}` 
+      });
+      
+      const tableData = employees
+        .filter(emp => {
+          const dept = departments.find(d => d.id === emp.departmentId);
+          const matchesUnit = selectedUnit === 'all' || (dept && dept.unitId === parseInt(selectedUnit));
+          const matchesSearch = searchQuery === "" || 
+            `${emp.firstName} ${emp.lastName}`.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            (emp.employeeId || "").toLowerCase().includes(searchQuery.toLowerCase());
+          return matchesUnit && matchesSearch;
+        })
+        .map(emp => [
+          emp.employeeId || '-',
+          `${emp.firstName} ${emp.lastName}`,
+          departments.find(d => d.id === emp.departmentId)?.name || '-',
+          emp.position || '-',
+          emp.joinDate ? new Date(emp.joinDate).toLocaleDateString() : 'N/A',
+          emp.employmentType || '-'
+        ]);
 
-    (doc as any).autoTable({
-      head: [['Emp ID', 'Name', 'Department', 'Position', 'Join Date', 'Type']],
-      body: tableData,
-      startY: 70,
-      headStyles: { fillStyle: 'F', fillColor: [15, 23, 42] }
-    });
+      (doc as any).autoTable({
+        head: [['Emp ID', 'Name', 'Department', 'Position', 'Join Date', 'Type']],
+        body: tableData,
+        startY: 70,
+        headStyles: { fillStyle: 'F', fillColor: [15, 23, 42] },
+        alternateRowStyles: { fillColor: [245, 247, 250] },
+        margin: { top: 70 }
+      });
 
-    addFooter(doc);
-    const refNumber = generateReferenceNumber("HDC");
-    addReferenceNumber(doc, refNumber, 68);
-    addDocumentDate(doc, undefined, 68);
-    doc.save(`headcount_report_${selectedMonth.replace(/\s+/g, '_')}.pdf`);
-    toast({ title: "PDF Exported Successfully" });
+      addFooter(doc);
+      const refNumber = generateReferenceNumber("HDC");
+      addReferenceNumber(doc, refNumber, 68);
+      addDocumentDate(doc, undefined, 68);
+      doc.save(`headcount_report_${selectedMonth.replace(/\s+/g, '_')}.pdf`);
+      toast({ title: "PDF Exported Successfully" });
+    } catch (error) {
+      console.error("PDF Export Error:", error);
+      toast({ title: "Export Failed", variant: "destructive" });
+    }
   };
 
   const handleExportExcel = () => {

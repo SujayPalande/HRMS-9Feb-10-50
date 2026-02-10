@@ -57,73 +57,117 @@ export default function PayrollReportPage() {
   );
 
   const getDetailedPayroll = (userId: number) => {
+    // Sync logic: If actual payment records exist, use them. 
+    // Otherwise, show the employee's base salary from their profile if it matches the filter
     const records = paymentRecords.filter(r => r.employeeId === userId && r.month === selectedMonth);
-    const totalAmount = records.reduce((sum, r) => sum + r.amount, 0);
-    const lastPayment = records.sort((a, b) => new Date(b.paymentDate).getTime() - new Date(a.paymentDate).getTime())[0];
     
-    return { 
-      totalAmount, 
-      count: records.length,
-      lastPaymentDate: lastPayment?.paymentDate,
-      lastPaymentMode: lastPayment?.paymentMode,
-      lastRefNo: lastPayment?.referenceNo
+    if (records.length > 0) {
+      const totalAmount = records.reduce((sum, r) => sum + r.amount, 0);
+      const lastPayment = records.sort((a, b) => new Date(b.paymentDate).getTime() - new Date(a.paymentDate).getTime())[0];
+      return { 
+        totalAmount, 
+        count: records.length,
+        lastPaymentDate: lastPayment?.paymentDate,
+        lastPaymentMode: lastPayment?.paymentMode,
+        lastRefNo: lastPayment?.referenceNo
+      };
+    }
+
+    // Fallback to profile salary for reporting purposes if no payment record exists yet
+    const emp = employees.find(e => e.id === userId);
+    return {
+      totalAmount: emp?.salary || 0,
+      count: 0,
+      lastPaymentDate: null,
+      lastPaymentMode: null,
+      lastRefNo: null
     };
   };
 
-  const totalMonthlyPayroll = paymentRecords
-    .filter(r => r.month === selectedMonth)
-    .reduce((sum, r) => sum + r.amount, 0);
+  const totalMonthlyPayroll = employees
+    .filter(emp => {
+      const dept = departments.find(d => d.id === emp.departmentId);
+      const matchesUnit = selectedUnit === 'all' || (dept && dept.unitId === parseInt(selectedUnit));
+      const matchesDept = selectedDept === 'all' || emp.departmentId === parseInt(selectedDept);
+      return matchesUnit && matchesDept;
+    })
+    .reduce((sum, emp) => {
+      const payroll = getDetailedPayroll(emp.id);
+      return sum + payroll.totalAmount;
+    }, 0);
+
+  const employeesPaidCount = employees.filter(emp => {
+    const payroll = getDetailedPayroll(emp.id);
+    return payroll.totalAmount > 0;
+  }).length;
 
   const payrollStats = [
     { title: "Total Payroll (Month)", value: `₹${totalMonthlyPayroll.toLocaleString()}`, icon: <IndianRupee className="h-5 w-5" />, color: "bg-teal-50 text-teal-600 dark:bg-teal-950 dark:text-teal-400" },
     { title: "Units", value: units.length.toString(), icon: <Building2 className="h-5 w-5" />, color: "bg-blue-50 text-blue-600 dark:bg-blue-950 dark:text-blue-400" },
     { title: "Departments", value: departments.length.toString(), icon: <Users className="h-5 w-5" />, color: "bg-green-50 text-green-600 dark:bg-green-950 dark:text-green-400" },
-    { title: "Employees Paid", value: paymentRecords.filter(r => r.month === selectedMonth).length.toString(), icon: <Users className="h-5 w-5" />, color: "bg-blue-50 text-blue-600 dark:bg-blue-950 dark:text-blue-400" },
+    { title: "Employees Processed", value: employeesPaidCount.toString(), icon: <Users className="h-5 w-5" />, color: "bg-blue-50 text-blue-600 dark:bg-blue-950 dark:text-blue-400" },
   ];
 
   const handleExportPDF = () => {
-    const doc = new jsPDF({ orientation: 'landscape' });
-    addWatermark(doc);
-    addCompanyHeader(doc, { 
-      title: "UNIT-WISE PAYROLL REPORT", 
-      subtitle: `Period: ${selectedMonth} | Unit: ${selectedUnit === 'all' ? 'All Units' : units.find(u => u.id === parseInt(selectedUnit))?.name}` 
-    });
-    
-    const tableData = employees
-      .filter(emp => {
-        const dept = departments.find(d => d.id === emp.departmentId);
-        return selectedUnit === 'all' || (dept && dept.unitId === parseInt(selectedUnit));
-      })
-      .map(emp => {
-        const payroll = getDetailedPayroll(emp.id);
-        return [
-          emp.employeeId || '-',
-          `${emp.firstName} ${emp.lastName}`,
-          departments.find(d => d.id === emp.departmentId)?.name || '-',
-          `₹${payroll.totalAmount.toLocaleString()}`
-        ];
+    try {
+      const doc = new jsPDF({ orientation: 'landscape' });
+      addWatermark(doc);
+      addCompanyHeader(doc, { 
+        title: "UNIT-WISE PAYROLL REPORT", 
+        subtitle: `Period: ${selectedMonth} | Unit: ${selectedUnit === 'all' ? 'All Units' : units.find(u => u.id === parseInt(selectedUnit))?.name}` 
+      });
+      
+      const tableData = employees
+        .filter(emp => {
+          const dept = departments.find(d => d.id === emp.departmentId);
+          const matchesUnit = selectedUnit === 'all' || (dept && dept.unitId === parseInt(selectedUnit));
+          const matchesDept = selectedDept === 'all' || emp.departmentId === parseInt(selectedDept);
+          const matchesSearch = searchQuery === "" || 
+            `${emp.firstName} ${emp.lastName}`.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            (emp.employeeId || "").toLowerCase().includes(searchQuery.toLowerCase());
+          return matchesUnit && matchesDept && matchesSearch;
+        })
+        .map(emp => {
+          const payroll = getDetailedPayroll(emp.id);
+          return [
+            emp.employeeId || '-',
+            `${emp.firstName} ${emp.lastName}`,
+            departments.find(d => d.id === emp.departmentId)?.name || '-',
+            `₹${payroll.totalAmount.toLocaleString()}`
+          ];
+        });
+
+      (doc as any).autoTable({
+        head: [['Emp ID', 'Name', 'Department', 'Amount']],
+        body: tableData,
+        startY: 70,
+        headStyles: { fillStyle: 'F', fillColor: [15, 23, 42] },
+        alternateRowStyles: { fillColor: [245, 247, 250] },
+        margin: { top: 70 }
       });
 
-    (doc as any).autoTable({
-      head: [['Emp ID', 'Name', 'Department', 'Amount Paid']],
-      body: tableData,
-      startY: 70,
-      headStyles: { fillStyle: 'F', fillColor: [15, 23, 42] }
-    });
-
-    addFooter(doc);
-    const refNumber = generateReferenceNumber("PAY");
-    addReferenceNumber(doc, refNumber, 68);
-    addDocumentDate(doc, undefined, 68);
-    doc.save(`payroll_report_${selectedMonth.replace(/\s+/g, '_')}.pdf`);
-    toast({ title: "PDF Exported Successfully" });
+      addFooter(doc);
+      const refNumber = generateReferenceNumber("PAY");
+      addReferenceNumber(doc, refNumber, 68);
+      addDocumentDate(doc, undefined, 68);
+      doc.save(`payroll_report_${selectedMonth.replace(/\s+/g, '_')}.pdf`);
+      toast({ title: "PDF Exported Successfully" });
+    } catch (error) {
+      console.error("PDF Export Error:", error);
+      toast({ 
+        title: "Export Failed", 
+        description: "There was an error generating the PDF. Please try again.",
+        variant: "destructive"
+      });
+    }
   };
 
   const handleExportExcel = () => {
     const dataToExport = employees
       .filter(emp => {
         const dept = departments.find(d => d.id === emp.departmentId);
-        return selectedUnit === 'all' || (dept && dept.unitId === parseInt(selectedUnit));
+        const matchesUnit = selectedUnit === 'all' || (dept && dept.unitId === parseInt(selectedUnit));
+        return matchesUnit;
       })
       .map(emp => {
         const payroll = getDetailedPayroll(emp.id);
@@ -131,7 +175,7 @@ export default function PayrollReportPage() {
           'Employee ID': emp.employeeId || '-',
           'Name': `${emp.firstName} ${emp.lastName}`,
           'Department': departments.find(d => d.id === emp.departmentId)?.name || '-',
-          'Amount Paid': payroll.totalAmount
+          'Amount': payroll.totalAmount
         };
       });
 
@@ -240,9 +284,7 @@ export default function PayrollReportPage() {
           <CardContent className="space-y-4">
             {filteredDepartments.map((dept) => {
               const deptEmployees = employees.filter(e => e.departmentId === dept.id);
-              const deptPayroll = paymentRecords
-                .filter(r => r.month === selectedMonth && deptEmployees.some(e => e.id === r.employeeId))
-                .reduce((sum, r) => sum + r.amount, 0);
+              const deptPayrollTotal = deptEmployees.reduce((sum, emp) => sum + (getDetailedPayroll(emp.id).totalAmount || 0), 0);
               
               return (
                 <div key={dept.id} className="border rounded-lg overflow-hidden">
@@ -254,7 +296,7 @@ export default function PayrollReportPage() {
                         {deptEmployees.length} Employees
                       </Badge>
                       <Badge variant="outline" className="ml-2">
-                        Total Dept Payroll: ₹{deptPayroll.toLocaleString()}
+                        Total Dept Payroll: ₹{deptPayrollTotal.toLocaleString()}
                       </Badge>
                     </div>
                   </div>
@@ -293,27 +335,24 @@ export default function PayrollReportPage() {
                                   exit={{ height: 0, opacity: 0 }}
                                   className="bg-slate-50/50 dark:bg-slate-900/50 p-4 border-t"
                                 >
-                                  {payroll.count > 0 ? (
-                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                      <div className="bg-white dark:bg-slate-950 p-3 rounded border">
-                                        <p className="text-xs text-slate-500 uppercase font-semibold">Payment Date</p>
-                                        <p className="text-lg font-bold">{payroll.lastPaymentDate ? new Date(payroll.lastPaymentDate).toLocaleDateString() : 'N/A'}</p>
-                                      </div>
-                                      <div className="bg-white dark:bg-slate-950 p-3 rounded border">
-                                        <p className="text-xs text-slate-500 uppercase font-semibold">Mode</p>
-                                        <p className="text-lg font-bold capitalize">{payroll.lastPaymentMode?.replace('_', ' ') || 'N/A'}</p>
-                                      </div>
-                                      <div className="bg-white dark:bg-slate-950 p-3 rounded border">
-                                        <p className="text-xs text-slate-500 uppercase font-semibold">Reference No</p>
-                                        <p className="text-lg font-bold">{payroll.lastRefNo || 'N/A'}</p>
-                                      </div>
+                                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                    <div className="bg-white dark:bg-slate-950 p-3 rounded border">
+                                      <p className="text-xs text-slate-500 uppercase font-semibold">Base Salary (Sync)</p>
+                                      <p className="text-lg font-bold">₹{(emp.salary || 0).toLocaleString()}</p>
                                     </div>
-                                  ) : (
-                                    <p className="text-sm text-slate-500 text-center py-2 italic">No payment records found for this month.</p>
-                                  )}
+                                    <div className="bg-white dark:bg-slate-950 p-3 rounded border">
+                                      <p className="text-xs text-slate-500 uppercase font-semibold">Payment Status</p>
+                                      <p className="text-lg font-bold">{payroll.count > 0 ? 'Disbursed' : 'In Progress'}</p>
+                                    </div>
+                                    <div className="bg-white dark:bg-slate-950 p-3 rounded border">
+                                      <p className="text-xs text-slate-500 uppercase font-semibold">Reference No</p>
+                                      <p className="text-lg font-bold">{payroll.lastRefNo || 'N/A'}</p>
+                                    </div>
+                                  </div>
+                                  
                                   <div className="mt-4 flex justify-end">
                                     <Button variant="outline" size="sm" onClick={() => window.location.href=`/payroll/payslips?id=${emp.id}`}>
-                                      View Payslips
+                                      View Detailed Payslip
                                     </Button>
                                   </div>
                                 </motion.div>
