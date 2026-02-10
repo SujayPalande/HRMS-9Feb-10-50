@@ -78,7 +78,7 @@ export default function PtPage() {
     });
     
     addHRSignature(doc, (doc as any).lastAutoTable.finalY + 20);
-    doc.save('pt-report.pdf');
+    doc.save('professional-tax-report.pdf');
   };
 
   return (
@@ -86,8 +86,8 @@ export default function PtPage() {
       <div className="space-y-6">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">Professional Tax (PT)</h1>
-            <p className="text-slate-500 mt-1">Manage state-wise professional tax</p>
+            <h1 className="text-2xl font-bold text-slate-900">Professional Tax</h1>
+            <p className="text-slate-500 mt-1">Manage state-wise Professional Tax</p>
           </div>
           <div className="flex gap-2">
             <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>

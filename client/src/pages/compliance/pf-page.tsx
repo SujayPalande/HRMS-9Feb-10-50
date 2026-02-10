@@ -104,7 +104,7 @@ export default function PfPage() {
     });
     
     addHRSignature(doc, (doc as any).lastAutoTable.finalY + 20);
-    doc.save('pf-report.pdf');
+    doc.save('provident-fund-report.pdf');
   };
 
   return (
@@ -112,8 +112,8 @@ export default function PfPage() {
       <div className="space-y-6">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">Provident Fund (PF)</h1>
-            <p className="text-slate-500 mt-1">Manage PF contributions and reports</p>
+            <h1 className="text-2xl font-bold text-slate-900">Provident Fund</h1>
+            <p className="text-slate-500 mt-1">Manage Provident Fund contributions and reports</p>
           </div>
           <div className="flex gap-2">
             <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>

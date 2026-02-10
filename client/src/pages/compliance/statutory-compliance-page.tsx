@@ -591,15 +591,15 @@ export default function StatutoryCompliancePage() {
               <TabsList className="grid w-full grid-cols-3 lg:w-auto lg:inline-flex">
                 <TabsTrigger value="pf" data-testid="tab-pf">
                   <Shield className="h-4 w-4 mr-2" />
-                  PF Data
+                  Provident Fund
                 </TabsTrigger>
                 <TabsTrigger value="esi" data-testid="tab-esi">
                   <Building2 className="h-4 w-4 mr-2" />
-                  ESI Data
+                  ESI
                 </TabsTrigger>
                 <TabsTrigger value="bonus" data-testid="tab-bonus">
                   <Gift className="h-4 w-4 mr-2" />
-                  Bonus Data
+                  Bonus
                 </TabsTrigger>
               </TabsList>
 

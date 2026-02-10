@@ -241,3 +241,5 @@
 [x] 241. Applied database schema using drizzle-kit push command - February 10, 2026
 [x] 242. ALL MIGRATION TASKS COMPLETE: Application successfully running on port 5000 - February 10, 2026
 [x] 243. Added EDLI (0.5%) and Admin charges (0.5%) columns to Provident Fund report - February 10, 2026
+[x] 244. Renamed Statutory Compliance reports to full names (Provident Fund, Employees' State Insurance, Professional Tax, Maharashtra Labour Welfare Fund, Bonus Reports) - February 10, 2026
+[x] 245. Updated PDF report filenames and headers to use full names for professional documentation - February 10, 2026

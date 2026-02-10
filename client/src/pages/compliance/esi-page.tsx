@@ -78,7 +78,7 @@ export default function EsiPage() {
     });
     
     addHRSignature(doc, (doc as any).lastAutoTable.finalY + 20);
-    doc.save('esi-report.pdf');
+    doc.save('employees-state-insurance-report.pdf');
   };
 
   return (
@@ -86,8 +86,8 @@ export default function EsiPage() {
       <div className="space-y-6">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">Employees' State Insurance (ESI)</h1>
-            <p className="text-slate-500 mt-1">Manage ESI contributions and reports</p>
+            <h1 className="text-2xl font-bold text-slate-900">Employees' State Insurance</h1>
+            <p className="text-slate-500 mt-1">Manage Employees' State Insurance contributions and reports</p>
           </div>
           <div className="flex gap-2">
             <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
