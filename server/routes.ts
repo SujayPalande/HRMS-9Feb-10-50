@@ -3,6 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth, hashPassword } from "./auth";
 import { 
+  insertUnitSchema,
   insertDepartmentSchema, 
   insertAttendanceSchema, 
   updateAttendanceSchema,
@@ -158,6 +159,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Master Data Routes
+  app.get("/api/masters/units", async (req, res, next) => {
+    try {
+      const units = await storage.getUnits();
+      res.json(units);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post("/api/masters/units", async (req, res, next) => {
+    try {
+      const validatedData = insertUnitSchema.parse(req.body);
+      const unit = await storage.createUnit(validatedData);
+      res.status(201).json(unit);
+    } catch (error) {
+      next(error);
+    }
+  });
+
   app.get("/api/masters/banks", async (req, res, next) => {
     try {
       const banks = await storage.getBankMasters();

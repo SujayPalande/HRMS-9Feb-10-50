@@ -1,4 +1,5 @@
 import { 
+  Unit, InsertUnit,
   User, InsertUser, Department, InsertDepartment, 
   Attendance, InsertAttendance, LeaveRequest, InsertLeaveRequest,
   Holiday, InsertHoliday, Notification, InsertNotification,
@@ -16,6 +17,8 @@ const MemoryStore = createMemoryStore(session);
 
 export interface IStorage {
   // Master data methods
+  getUnits(): Promise<Unit[]>;
+  createUnit(unit: InsertUnit): Promise<Unit>;
   getBankMasters(): Promise<BankMaster[]>;
   createBankMaster(bank: InsertBankMaster): Promise<BankMaster>;
   getCategoryMasters(): Promise<CategoryMaster[]>;
@@ -103,6 +106,7 @@ export interface IStorage {
 }
 
 export class MemStorage implements IStorage {
+  private units: Map<number, Unit>;
   private users: Map<number, User>;
   private departments: Map<number, Department>;
   private attendanceRecords: Map<number, Attendance>;
@@ -118,6 +122,7 @@ export class MemStorage implements IStorage {
   private documentApprovals: Map<number, DocumentApproval>;
   private employeeDeductions: Map<number, EmployeeDeduction>;
   
+  currentUnitId: number;
   currentUserId: number;
   currentDepartmentId: number;
   currentAttendanceId: number;
@@ -135,6 +140,7 @@ export class MemStorage implements IStorage {
   sessionStore: session.Store;
 
   constructor() {
+    this.units = new Map();
     this.users = new Map();
     this.departments = new Map();
     this.attendanceRecords = new Map();
@@ -150,6 +156,7 @@ export class MemStorage implements IStorage {
     this.documentApprovals = new Map();
     this.employeeDeductions = new Map();
     
+    this.currentUnitId = 1;
     this.currentUserId = 1;
     this.currentDepartmentId = 1;
     this.currentAttendanceId = 1;
@@ -169,11 +176,19 @@ export class MemStorage implements IStorage {
       checkPeriod: 86400000 // prune expired entries every 24h
     });
     
+    // Initialize with sample units
+    this.createUnit({
+      code: "CB",
+      name: "Cybaemtech",
+      description: "Main development and operations hub"
+    });
+
     // Initialize with sample departments
     this.createDepartment({ 
       code: "HR",
       name: "Human Resources", 
-      description: "Manages employee relations, hiring, and company policies" 
+      description: "Manages employee relations, hiring, and company policies",
+      unitId: 1
     });
     this.createDepartment({ 
       code: "ENG",
@@ -407,6 +422,21 @@ export class MemStorage implements IStorage {
       this.currentUserId = user.id + 1;
     }
     return user;
+  }
+
+  async getUnits(): Promise<Unit[]> {
+    return Array.from(this.units.values());
+  }
+
+  async createUnit(insertUnit: InsertUnit): Promise<Unit> {
+    const id = this.currentUnitId++;
+    const unit: Unit = { 
+      ...insertUnit, 
+      id,
+      description: insertUnit.description ?? null
+    };
+    this.units.set(id, unit);
+    return unit;
   }
 
   async getBankMasters(): Promise<BankMaster[]> {

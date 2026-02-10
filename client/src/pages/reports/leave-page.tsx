@@ -11,7 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query";
 import jsPDF from "jspdf";
 import { addCompanyHeader, addWatermark, addHRSignature, addFooter, addDocumentDate, generateReferenceNumber, addReferenceNumber } from "@/lib/pdf-utils";
-import { User, Department } from "@shared/schema";
+import { User, Department, Unit } from "@shared/schema";
 
 export default function LeaveReportPage() {
   const [selectedMonth, setSelectedMonth] = useState("January 2025");
@@ -20,6 +20,7 @@ export default function LeaveReportPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const { toast } = useToast();
 
+  const { data: units = [] } = useQuery<Unit[]>({ queryKey: ["/api/masters/units"] });
   const { data: employees = [] } = useQuery<User[]>({ queryKey: ["/api/employees"] });
   const { data: departments = [] } = useQuery<Department[]>({ queryKey: ["/api/departments"] });
 
@@ -30,7 +31,9 @@ export default function LeaveReportPage() {
     setExpandedDepts(newSet);
   };
 
-  const units = ["Cybaemtech", "Other Unit"];
+  const filteredDepartments = departments.filter(d => 
+    selectedUnit === "all" || d.unitId === parseInt(selectedUnit)
+  );
 
   const leaveStats = [
     { title: "Total Leave Taken", value: "456", icon: <CalendarDays className="h-5 w-5" />, color: "bg-teal-50 text-teal-600" },
@@ -96,7 +99,7 @@ export default function LeaveReportPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Units</SelectItem>
-                {units.map(u => <SelectItem key={u} value={u.toLowerCase()}>{u}</SelectItem>)}
+                {units.map(u => <SelectItem key={u.id} value={u.id.toString()}>{u.name}</SelectItem>)}
               </SelectContent>
             </Select>
             <Button variant="outline" className="gap-2" onClick={handleExportPDF}>
@@ -143,7 +146,7 @@ export default function LeaveReportPage() {
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
-            {departments.map((dept) => (
+            {filteredDepartments.map((dept) => (
               <div key={dept.id} className="border rounded-lg overflow-hidden">
                 <button
                   onClick={() => toggleDept(dept.id)}

@@ -5,6 +5,23 @@ import { z } from "zod";
 // Role enum for role-based access control
 export const roleEnum = pgEnum('role', ['admin', 'hr', 'manager', 'employee', 'developer']);
 
+// Unit schema
+export const units = pgTable("units", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull().unique(),
+  code: text("code").notNull(),
+  description: text("description"),
+});
+
+export const insertUnitSchema = createInsertSchema(units).pick({
+  name: true,
+  code: true,
+  description: true,
+});
+
+export type InsertUnit = z.infer<typeof insertUnitSchema>;
+export type Unit = typeof units.$inferSelect;
+
 // Department schema
 export const departments = pgTable("departments", {
   id: serial("id").primaryKey(),
@@ -13,6 +30,7 @@ export const departments = pgTable("departments", {
   manager: text("manager"),
   location: text("location"),
   description: text("description"),
+  unitId: integer("unit_id").references(() => units.id),
 });
 
 export const insertDepartmentSchema = createInsertSchema(departments).pick({
