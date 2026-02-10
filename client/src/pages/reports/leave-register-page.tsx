@@ -87,8 +87,9 @@ export default function LeaveRegisterPage() {
   const years = Array.from({ length: 5 }, (_, i) => currentDate.getFullYear() - 2 + i);
 
   const calculateLeaveData = (employee: Employee) => {
-    const yearStart = new Date(selectedYear, 0, 1);
-    const yearEnd = new Date(selectedYear, 11, 31);
+    // Financial Year 2025-2026: April 1, 2025 to March 31, 2026
+    const yearStart = new Date(selectedYear, 3, 1);
+    const yearEnd = new Date(selectedYear + 1, 2, 31);
 
     const yearAttendance = attendanceRecords.filter(a => {
       const date = new Date(a.date);
@@ -102,7 +103,7 @@ export default function LeaveRegisterPage() {
       const start = new Date(l.startDate);
       return l.userId === employee.id && 
              l.status === "approved" && 
-             start.getFullYear() === selectedYear;
+             start >= yearStart && start <= yearEnd;
     });
 
     const maternityLeave = employeeLeaves
@@ -162,7 +163,7 @@ export default function LeaveRegisterPage() {
     doc.text(`Factory: ${factoryName}`, 14, 42);
     doc.text(`Department: ${departmentName}`, 14, 48);
     doc.text(`Part I - Adults`, doc.internal.pageSize.width - 60, 42);
-    doc.text(`Calendar Year: ${selectedYear}`, doc.internal.pageSize.width - 60, 48);
+    doc.text(`Financial Year: ${selectedYear}-${selectedYear + 1}`, doc.internal.pageSize.width - 60, 48);
 
     const tableData = employees.map((emp, index) => {
       const data = calculateLeaveData(emp);
@@ -219,7 +220,7 @@ export default function LeaveRegisterPage() {
       [""],
       [`Factory: ${factoryName}`],
       [`Department: ${departmentName}`],
-      [`Calendar Year: ${selectedYear}`],
+      [`Financial Year: ${selectedYear}-${selectedYear + 1}`],
       ["Part I - Adults"],
       [""]
     ];
@@ -431,14 +432,14 @@ export default function LeaveRegisterPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label>Calendar Year</Label>
+                <Label>Financial Year</Label>
                 <Select value={String(selectedYear)} onValueChange={(v) => setSelectedYear(Number(v))}>
                   <SelectTrigger data-testid="select-year">
-                    <SelectValue />
+                    <SelectValue placeholder="Select Year" />
                   </SelectTrigger>
                   <SelectContent>
                     {years.map((y) => (
-                      <SelectItem key={y} value={String(y)}>{y}</SelectItem>
+                      <SelectItem key={y} value={String(y)}>{y}-{y + 1}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -462,7 +463,7 @@ export default function LeaveRegisterPage() {
               </div>
               <div className="text-right">
                 <p><strong>Part I - Adults</strong></p>
-                <p><strong>Calendar Year:</strong> {selectedYear}</p>
+                <p><strong>Financial Year:</strong> {selectedYear}-{selectedYear + 1}</p>
               </div>
             </div>
           </CardHeader>

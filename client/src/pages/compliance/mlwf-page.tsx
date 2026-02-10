@@ -27,13 +27,18 @@ export default function MlwfPage() {
       .filter(emp => emp.isActive && emp.salary && emp.salary > 0)
       .map(emp => {
         const grossSalary = Math.round(emp.salary! / 12);
-        // Typical MLWF rates (Example: Employee Rs 12, Employer Rs 36)
+        // Half-yearly (June & December): Employee Rs 25, Employer Rs 75
+        const currentMonth = new Date().getMonth() + 1;
+        const isMlwfMonth = currentMonth === 6 || currentMonth === 12;
+        const employeeContrib = isMlwfMonth ? 25 : 0;
+        const employerContrib = isMlwfMonth ? 75 : 0;
+        
         return {
           employee: `${emp.firstName} ${emp.lastName}`,
           grossSalary,
-          employeeContrib: 12,
-          employerContrib: 36,
-          total: 48
+          employeeContrib,
+          employerContrib,
+          total: employeeContrib + employerContrib
         };
       });
   }, [employees]);
