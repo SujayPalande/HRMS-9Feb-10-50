@@ -179,6 +179,10 @@ export default function AttendanceReportPage() {
                                 <div>
                                   <p className="font-medium">{emp.firstName} {emp.lastName}</p>
                                   <p className="text-xs text-slate-500">{emp.employeeId} | {emp.position}</p>
+                                  <div className="flex items-center gap-2 mt-1">
+                                    <Badge variant="outline" className="text-[10px] h-4">Present: 22</Badge>
+                                    <Badge variant="outline" className="text-[10px] h-4 text-red-600 border-red-200">Absent: 2</Badge>
+                                  </div>
                                 </div>
                               </div>
                               <Button variant="ghost" size="sm" onClick={() => window.location.href=`/employee/${emp.id}`}>View Details</Button>

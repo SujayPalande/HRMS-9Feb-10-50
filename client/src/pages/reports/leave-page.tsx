@@ -39,7 +39,7 @@ export default function LeaveReportPage() {
     { title: "Total Leave Taken", value: "456", icon: <CalendarDays className="h-5 w-5" />, color: "bg-teal-50 text-teal-600" },
     { title: "Pending Requests", value: "12", icon: <Clock className="h-5 w-5" />, color: "bg-yellow-50 text-yellow-600" },
     { title: "Avg. Leave/Employee", value: "8.5", icon: <Users className="h-5 w-5" />, color: "bg-blue-50 text-blue-600" },
-    { title: "Leave Balance", value: "1,245", icon: <TrendingUp className="h-5 w-5" />, color: "bg-green-50 text-green-600" },
+    { title: "Utilization", value: "65%", icon: <TrendingUp className="h-5 w-5" />, color: "bg-green-50 text-green-600" },
   ];
 
   const handleExportPDF = () => {
@@ -177,7 +177,13 @@ export default function LeaveReportPage() {
                                 <div className="p-2 rounded-full bg-slate-100"><UserIcon className="h-4 w-4 text-slate-500" /></div>
                                 <div>
                                   <p className="font-medium">{emp.firstName} {emp.lastName}</p>
-                                  <p className="text-xs text-slate-500">{emp.employeeId} | {emp.position}</p>
+                                  <div className="flex items-center gap-2 mt-1">
+                                    <div className="w-24 h-2 bg-slate-100 rounded-full overflow-hidden">
+                                      <div className="h-full bg-teal-500" style={{ width: '65%' }}></div>
+                                    </div>
+                                    <span className="text-xs text-slate-500">65% Utilized</span>
+                                  </div>
+                                  <p className="text-xs text-slate-500 mt-1">{emp.employeeId} | {emp.position}</p>
                                 </div>
                               </div>
                               <Button variant="ghost" size="sm" onClick={() => window.location.href=`/employee/${emp.id}`}>View Details</Button>
