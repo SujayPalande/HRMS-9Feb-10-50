@@ -30,7 +30,7 @@ export default function BonusReportsPage() {
     const ws = XLSX.utils.json_to_sheet(bonusData);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Bonus Data");
-    XLSX.writeFile(wb, "Bonus_Report.xlsx");
+    XLSX.writeFile(wb, "bonus-report.xlsx");
     toast({ title: "Bonus Report Exported", description: "Excel file generated." });
   };
 

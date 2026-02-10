@@ -275,10 +275,10 @@ export function Sidebar({ className }: SidebarProps) {
         { title: "Muster Roll - Form II", href: "/reports/muster-roll", icon: <ClipboardList className="h-4 w-4" />, permissions: ["reports.view"] },
         { title: "Leave Register - Form 20", href: "/reports/leave-register", icon: <BookOpen className="h-4 w-4" />, permissions: ["reports.view"] },
         { title: "Headcount Report", href: "/reports/headcount", icon: <Users className="h-4 w-4" />, permissions: ["reports.view"] },
-        { title: "PF", href: "/compliance/pf", icon: <Shield className="h-4 w-4" />, permissions: ["payroll.view"] },
-        { title: "ESI", href: "/compliance/esi", icon: <Building2 className="h-4 w-4" />, permissions: ["payroll.view"] },
-        { title: "PT", href: "/compliance/pt", icon: <Calculator className="h-4 w-4" />, permissions: ["payroll.view"] },
-        { title: "MLWF", href: "/compliance/mlwf", icon: <Shield className="h-4 w-4" />, permissions: ["payroll.view"] },
+        { title: "Provident Fund", href: "/compliance/pf", icon: <Shield className="h-4 w-4" />, permissions: ["payroll.view"] },
+        { title: "Employees' State Insurance", href: "/compliance/esi", icon: <Building2 className="h-4 w-4" />, permissions: ["payroll.view"] },
+        { title: "Professional Tax", href: "/compliance/pt", icon: <Calculator className="h-4 w-4" />, permissions: ["payroll.view"] },
+        { title: "Maharashtra Labour Welfare Fund", href: "/compliance/mlwf", icon: <Shield className="h-4 w-4" />, permissions: ["payroll.view"] },
         { title: "Bonus Reports", href: "/compliance/bonus-reports", icon: <FileSpreadsheet className="h-4 w-4" />, permissions: ["payroll.view"] },
         { title: "Form 16", href: "/compliance/form16-tds", icon: <FileText className="h-4 w-4" />, permissions: ["payroll.view"] }
       ]
