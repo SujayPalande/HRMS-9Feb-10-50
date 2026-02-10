@@ -97,44 +97,62 @@ export default function LeaveReportPage() {
   ];
 
   const handleExportPDF = () => {
-    const doc = new jsPDF({ orientation: 'landscape' });
-    addWatermark(doc);
-    addCompanyHeader(doc, { 
-      title: "UNIT-WISE LEAVE REPORT", 
-      subtitle: `Period: ${selectedMonth} | Unit: ${selectedUnit === 'all' ? 'All Units' : units.find(u => u.id === parseInt(selectedUnit))?.name}` 
-    });
-    
-    const tableData = employees
-      .filter(emp => {
-        const dept = departments.find(d => d.id === emp.departmentId);
-        const matchesUnit = selectedUnit === 'all' || (dept && dept.unitId === parseInt(selectedUnit));
-        return matchesUnit;
-      })
-      .map(emp => {
-        const stats = getDetailedLeaveStats(emp.id);
-        return [
-          emp.employeeId || '-',
-          `${emp.firstName} ${emp.lastName}`,
-          departments.find(d => d.id === emp.departmentId)?.name || '-',
-          stats.approved.toString(),
-          stats.pending.toString(),
-          stats.remaining.toString()
-        ];
+    try {
+      const doc = new jsPDF({ orientation: 'landscape' });
+      addWatermark(doc);
+      addCompanyHeader(doc, { 
+        title: "UNIT-WISE LEAVE REPORT", 
+        subtitle: `Period: ${selectedMonth} | Unit: ${selectedUnit === 'all' ? 'All Units' : units.find(u => u.id === parseInt(selectedUnit))?.name}` 
       });
+      
+      const tableData = employees
+        .filter(emp => {
+          const dept = departments.find(d => d.id === emp.departmentId);
+          const matchesUnit = selectedUnit === 'all' || (dept && dept.unitId === parseInt(selectedUnit));
+          const matchesSearch = searchQuery === "" || 
+            `${emp.firstName} ${emp.lastName}`.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            (emp.employeeId || "").toLowerCase().includes(searchQuery.toLowerCase());
+          return matchesUnit && matchesSearch;
+        })
+        .map(emp => {
+          const stats = getDetailedLeaveStats(emp.id);
+          return [
+            emp.employeeId || '-',
+            `${emp.firstName} ${emp.lastName}`,
+            departments.find(d => d.id === emp.departmentId)?.name || '-',
+            stats.approved.toString(),
+            stats.pending.toString(),
+            stats.remaining.toString()
+          ];
+        });
 
-    (doc as any).autoTable({
-      head: [['Emp ID', 'Name', 'Department', 'Approved', 'Pending', 'Remaining']],
-      body: tableData,
-      startY: 70,
-      headStyles: { fillStyle: 'F', fillColor: [15, 23, 42] }
-    });
+      if ((doc as any).autoTable) {
+        (doc as any).autoTable({
+          head: [['Emp ID', 'Name', 'Department', 'Approved', 'Pending', 'Remaining']],
+          body: tableData,
+          startY: 70,
+          headStyles: { fillStyle: 'F', fillColor: [15, 23, 42] },
+          alternateRowStyles: { fillColor: [245, 247, 250] },
+          margin: { top: 70 }
+        });
+      } else {
+        throw new Error("autoTable plugin not loaded");
+      }
 
-    addFooter(doc);
-    const refNumber = generateReferenceNumber("LVE");
-    addReferenceNumber(doc, refNumber, 68);
-    addDocumentDate(doc, undefined, 68);
-    doc.save(`leave_report_${selectedMonth.replace(/\s+/g, '_')}.pdf`);
-    toast({ title: "PDF Exported Successfully" });
+      addFooter(doc);
+      const refNumber = generateReferenceNumber("LVE");
+      addReferenceNumber(doc, refNumber, 68);
+      addDocumentDate(doc, undefined, 68);
+      doc.save(`leave_report_${selectedMonth.replace(/\s+/g, '_')}.pdf`);
+      toast({ title: "PDF Exported Successfully" });
+    } catch (error) {
+      console.error("PDF Export Error:", error);
+      toast({ 
+        title: "Export Failed", 
+        description: "There was an error generating the PDF. Please try again.",
+        variant: "destructive"
+      });
+    }
   };
 
   const handleExportExcel = () => {

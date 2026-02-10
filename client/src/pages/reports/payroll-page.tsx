@@ -137,14 +137,18 @@ export default function PayrollReportPage() {
           ];
         });
 
-      (doc as any).autoTable({
-        head: [['Emp ID', 'Name', 'Department', 'Amount']],
-        body: tableData,
-        startY: 70,
-        headStyles: { fillStyle: 'F', fillColor: [15, 23, 42] },
-        alternateRowStyles: { fillColor: [245, 247, 250] },
-        margin: { top: 70 }
-      });
+      if ((doc as any).autoTable) {
+        (doc as any).autoTable({
+          head: [['Emp ID', 'Name', 'Department', 'Amount']],
+          body: tableData,
+          startY: 70,
+          headStyles: { fillStyle: 'F', fillColor: [15, 23, 42] },
+          alternateRowStyles: { fillColor: [245, 247, 250] },
+          margin: { top: 70 }
+        });
+      } else {
+        throw new Error("autoTable plugin not loaded");
+      }
 
       addFooter(doc);
       const refNumber = generateReferenceNumber("PAY");

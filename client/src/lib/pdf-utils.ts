@@ -1,5 +1,14 @@
 import jsPDF from "jspdf";
+import "jspdf-autotable";
 import { ASN_LOGO_BASE64 } from "./logo-data";
+
+// Type definition for autoTable extension to jsPDF
+export interface jsPDFWithAutoTable extends jsPDF {
+  autoTable: (options: any) => jsPDF;
+  lastAutoTable: {
+    finalY: number;
+  };
+}
 
 export const COMPANY_NAME = "ASN HR Consultancy & Services";
 export const COMPANY_TAGLINE = "Your Trusted HR Partner";
@@ -30,9 +39,6 @@ export async function addCompanyHeader(doc: jsPDF, config: PDFConfig = { title: 
   doc.rect(0, 35, pageWidth, 3, "F");
   
   try {
-    // Attempt to use the login logo
-    // Using a reliable way to get the image as base64 if possible, or just addImage URL
-    // Since we are in browser environment, addImage with URL should work if the server serves it
     doc.addImage(LOGIN_LOGO_URL, "PNG", 10, 5, 25, 25); 
   } catch (e) {
     try {
@@ -82,7 +88,8 @@ export function addWatermark(doc: jsPDF) {
     const centerX = (pageWidth - logoWidth) / 2;
     const centerY = (pageHeight - logoHeight) / 2;
     
-    doc.setGState(new (doc as any).GState({ opacity: 0.08 }));
+    // Use raw style for GState since the type might not be exposed correctly
+    (doc as any).setGState(new (doc as any).GState({ opacity: 0.08 }));
     doc.addImage(ASN_LOGO_BASE64, "PNG", centerX, centerY, logoWidth, logoHeight);
   } catch (e) {
     doc.setTextColor(245, 245, 245);
