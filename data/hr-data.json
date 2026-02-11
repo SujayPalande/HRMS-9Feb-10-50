@@ -4618,6 +4618,15 @@
       "notes": "",
       "id": 520,
       "checkOutTime": null
+    },
+    {
+      "userId": 29,
+      "checkInTime": "2026-02-11T04:58:38.010Z",
+      "date": "2026-02-11T04:58:38.010Z",
+      "status": "present",
+      "notes": "",
+      "id": 521,
+      "checkOutTime": null
     }
   ],
   "leaveRequests": [
@@ -13253,14 +13262,25 @@
       "createdAt": "2026-02-11T04:54:24.080Z",
       "relatedUserId": null,
       "relatedLeaveId": null
+    },
+    {
+      "userId": 29,
+      "type": "login",
+      "title": "Successful Login",
+      "message": "You have successfully logged in at 2/11/2026",
+      "isRead": false,
+      "id": 731,
+      "createdAt": "2026-02-11T04:58:12.667Z",
+      "relatedUserId": null,
+      "relatedLeaveId": null
     }
   ],
   "currentUserId": 40,
   "currentDepartmentId": 11,
-  "currentAttendanceId": 521,
+  "currentAttendanceId": 522,
   "currentLeaveRequestId": 41,
   "currentHolidayId": 67,
-  "currentNotificationId": 731,
+  "currentNotificationId": 732,
   "paymentRecords": [
     {
       "id": 1,
