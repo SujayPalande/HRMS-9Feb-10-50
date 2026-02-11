@@ -250,6 +250,29 @@ export default function AttendanceReportPage() {
     toast({ title: "Individual Excel Exported" });
   };
 
+  const handleExportIndividualText = (emp: User) => {
+    const stats = getDetailedAttendance(emp.id);
+    const dept = departments.find(d => d.id === emp.departmentId);
+    
+    let textContent = `ATTENDANCE STATEMENT - ${selectedMonth}\n`;
+    textContent += `Employee: ${emp.firstName} ${emp.lastName} (${emp.employeeId})\n`;
+    textContent += `Department: ${dept?.name || '-'}\n`;
+    textContent += "=".repeat(50) + "\n";
+    textContent += `Present Days: ${stats.present}\n`;
+    textContent += `Absent Days: ${stats.absent}\n`;
+    textContent += `Half Days: ${stats.halfday}\n`;
+    textContent += `Late Arrivals: ${stats.late}\n`;
+    textContent += `Total Days: ${stats.total}\n`;
+    
+    const blob = new Blob([textContent], { type: "text/plain" });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `attendance_${emp.firstName}_${emp.lastName}.txt`;
+    a.click();
+    toast({ title: "Individual Text Exported" });
+  };
+
   return (
     <AppLayout>
       <div className="space-y-6">
@@ -423,14 +446,28 @@ export default function AttendanceReportPage() {
                                       <p className="text-[10px] text-slate-400 uppercase font-bold tracking-widest mb-1">Absent</p>
                                       <p className="text-xl font-black text-rose-600">{stats.absent}</p>
                                     </div>
+                                    <div className="bg-white dark:bg-slate-950 p-4 rounded-xl border shadow-sm transition-transform hover:scale-[1.02]">
+                                      <p className="text-[10px] text-slate-400 uppercase font-bold tracking-widest mb-1">Half Day</p>
+                                      <p className="text-xl font-black text-amber-600">{stats.halfday}</p>
+                                    </div>
+                                    <div className="bg-white dark:bg-slate-950 p-4 rounded-xl border shadow-sm transition-transform hover:scale-[1.02]">
+                                      <p className="text-[10px] text-slate-400 uppercase font-bold tracking-widest mb-1">Late Arrivals</p>
+                                      <p className="text-xl font-black text-blue-600">{stats.late}</p>
+                                    </div>
                                   </div>
                                   
-                                  <div className="flex justify-end gap-3">
+                                  <div className="flex justify-end gap-3 flex-wrap">
                                     <Button variant="outline" size="sm" className="h-8 rounded-lg text-xs font-bold gap-2 hover-elevate" onClick={() => handleDownloadIndividualPDF(emp)}>
-                                      <FileDown className="h-3.5 w-3.5" /> PDF Statement
+                                      <FileDown className="h-3.5 w-3.5" /> PDF
                                     </Button>
                                     <Button variant="outline" size="sm" className="h-8 rounded-lg text-xs font-bold gap-2 hover-elevate" onClick={() => handleExportIndividualExcel(emp)}>
-                                      <FileSpreadsheet className="h-3.5 w-3.5" /> Excel Data
+                                      <FileSpreadsheet className="h-3.5 w-3.5" /> Excel
+                                    </Button>
+                                    <Button variant="outline" size="sm" className="h-8 rounded-lg text-xs font-bold gap-2 hover-elevate" onClick={() => handleExportIndividualText(emp)}>
+                                      <FileText className="h-3.5 w-3.5" /> Text
+                                    </Button>
+                                    <Button variant="outline" size="sm" className="h-8 rounded-lg text-xs font-bold gap-2 hover-elevate" onClick={() => window.location.href=`/employee/${emp.id}`}>
+                                      Full History
                                     </Button>
                                   </div>
                                 </motion.div>

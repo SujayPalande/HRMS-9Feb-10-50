@@ -66,6 +66,7 @@ export default function LeaveReportPage() {
     const userLeaves = leaveRequests.filter(r => r.userId === userId);
     const approved = userLeaves.filter(r => r.status === 'approved');
     return {
+      total: userLeaves.length,
       approved: approved.length,
       pending: userLeaves.filter(r => r.status === 'pending').length,
       rejected: userLeaves.filter(r => r.status === 'rejected').length,
@@ -98,8 +99,41 @@ export default function LeaveReportPage() {
       autoTable(doc, { head: [['Emp ID', 'Name', 'Department', 'Approved', 'Pending', 'Remaining']], body: tableData, startY: 70 });
       addFooter(doc);
       doc.save(`leave_report_${selectedMonth}.pdf`);
-      toast({ title: "PDF Exported" });
+      toast({ title: "PDF Exported Successfully" });
     } catch (error) { toast({ title: "Export Failed", variant: "destructive" }); }
+  };
+
+  const handleExportExcel = () => {
+    const dataToExport = filteredEmployees.map(emp => {
+      const stats = getDetailedLeaveStats(emp.id);
+      return {
+        'Employee ID': emp.employeeId || '-',
+        'Name': `${emp.firstName} ${emp.lastName}`,
+        'Department': departments.find(d => d.id === emp.departmentId)?.name || '-',
+        'Approved': stats.approved,
+        'Pending': stats.pending,
+        'Remaining': stats.remaining
+      };
+    });
+    const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Leaves");
+    XLSX.writeFile(workbook, `leave_report_${selectedMonth}.xlsx`);
+    toast({ title: "Excel Exported Successfully" });
+  };
+
+  const handleExportText = () => {
+    const dataToExport = filteredEmployees.map(emp => {
+      const stats = getDetailedLeaveStats(emp.id);
+      return `${emp.employeeId || '-'}\t${emp.firstName} ${emp.lastName}\t${stats.approved}\t${stats.pending}\t${stats.remaining}\n`;
+    });
+    const blob = new Blob([dataToExport.join("")], { type: "text/plain" });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `leave_report_${selectedMonth}.txt`;
+    a.click();
+    toast({ title: "Text Exported Successfully" });
   };
 
   const handleDownloadIndividualPDF = (emp: User) => {
@@ -111,11 +145,20 @@ export default function LeaveReportPage() {
       autoTable(doc, {
         startY: 70,
         head: [['Metric', 'Value']],
-        body: [['Approved', stats.approved], ['Pending', stats.pending], ['Remaining', stats.remaining]]
+        body: [['Accrued', stats.accrued], ['Approved', stats.approved], ['Pending', stats.pending], ['Remaining', stats.remaining]]
       });
       addHRSignature(doc, 150);
       doc.save(`leave_${emp.firstName}.pdf`);
     } catch (e) {}
+  };
+
+  const handleExportIndividualExcel = (emp: User) => {
+    const stats = getDetailedLeaveStats(emp.id);
+    const data = [{ 'Metric': 'Accrued', 'Value': stats.accrued }, { 'Metric': 'Approved', 'Value': stats.approved }, { 'Metric': 'Pending', 'Value': stats.pending }, { 'Metric': 'Remaining', 'Value': stats.remaining }];
+    const worksheet = XLSX.utils.json_to_sheet(data);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "LeaveStats");
+    XLSX.writeFile(workbook, `leave_${emp.firstName}_stats.xlsx`);
   };
 
   return (
@@ -126,8 +169,28 @@ export default function LeaveReportPage() {
             <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Unit-wise Leave Reports</h1>
             <p className="text-slate-500">Hierarchical leave analysis</p>
           </div>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={handleExportPDF}><FileDown className="h-4 w-4 mr-2" /> PDF Report</Button>
+          <div className="flex gap-2 flex-wrap">
+            <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+              <SelectTrigger className="w-40 h-9">
+                <Calendar className="h-4 w-4 mr-2" />
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="January 2026">Jan 2026</SelectItem>
+                <SelectItem value="December 2025">Dec 2025</SelectItem>
+              </SelectContent>
+            </Select>
+            <div className="flex bg-slate-100 dark:bg-slate-900 rounded-lg p-1 border border-slate-200 dark:border-slate-800">
+              <Button variant="ghost" size="sm" className="h-7 text-xs gap-1 hover-elevate px-2" onClick={handleExportPDF}>
+                <FileDown className="h-3 w-3" /> PDF
+              </Button>
+              <Button variant="ghost" size="sm" className="h-7 text-xs gap-1 hover-elevate px-2" onClick={handleExportExcel}>
+                <FileSpreadsheet className="h-3 w-3" /> Excel
+              </Button>
+              <Button variant="ghost" size="sm" className="h-7 text-xs gap-1 hover-elevate px-2" onClick={handleExportText}>
+                <FileText className="h-3 w-3" /> Text
+              </Button>
+            </div>
           </div>
         </div>
 
@@ -154,9 +217,9 @@ export default function LeaveReportPage() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {leaveStats.map((stat) => (
-            <Card key={stat.title}><CardContent className="p-6 flex items-center gap-4">
+            <Card key={stat.title} className="hover-elevate"><CardContent className="p-6 flex items-center gap-4">
               <div className={`p-3 rounded-xl ${stat.color}`}>{stat.icon}</div>
-              <div><p className="text-2xl font-bold">{stat.value}</p><p className="text-sm text-slate-500">{stat.title}</p></div>
+              <div><p className="text-2xl font-bold">{stat.value}</p><p className="text-sm text-slate-500 uppercase tracking-wider">{stat.title}</p></div>
             </CardContent></Card>
           ))}
         </div>
@@ -165,7 +228,10 @@ export default function LeaveReportPage() {
           <CardHeader>
             <div className="flex items-center justify-between">
               <CardTitle className="flex items-center gap-2"><Building2 className="h-5 w-5 text-teal-600" /> Unit Hierarchy</CardTitle>
-              <Input placeholder="Search..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="w-64" />
+              <div className="relative w-64">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                <Input placeholder="Search employees..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="pl-9" />
+              </div>
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -173,7 +239,7 @@ export default function LeaveReportPage() {
               const deptEmployees = filteredEmployees.filter(e => e.departmentId === dept.id);
               if (deptEmployees.length === 0) return null;
               return (
-                <div key={dept.id} className="border rounded-lg overflow-hidden">
+                <div key={dept.id} className="border rounded-lg overflow-hidden transition-all hover:border-teal-200">
                   <div className="p-4 bg-slate-50 dark:bg-slate-900 border-b flex justify-between items-center">
                     <span className="font-semibold">{dept.name}</span>
                     <Badge variant="secondary">{deptEmployees.length} Employees</Badge>
@@ -184,25 +250,42 @@ export default function LeaveReportPage() {
                       const isExpanded = expandedEmployees.has(emp.id);
                       return (
                         <div key={emp.id}>
-                          <button onClick={() => toggleEmployee(emp.id)} className="w-full p-4 flex items-center justify-between hover:bg-slate-50">
+                          <button onClick={() => toggleEmployee(emp.id)} className="w-full p-4 flex items-center justify-between hover:bg-slate-50 transition-all">
                             <div className="flex items-center gap-3">
                               {isExpanded ? <ChevronDown className="h-4 w-4 text-teal-600" /> : <ChevronRight className="h-4 w-4" />}
-                              <div><p className="font-medium">{emp.firstName} {emp.lastName}</p><p className="text-xs text-slate-500">{emp.position}</p></div>
+                              <div className="text-left"><p className="font-semibold">{emp.firstName} {emp.lastName}</p><p className="text-xs text-slate-500 uppercase">{emp.employeeId} • {emp.position}</p></div>
                             </div>
                             <div className="flex gap-2">
-                              <Badge variant="outline" className="text-teal-600">Used: {stats.approved}</Badge>
-                              <Badge variant="outline">Rem: {stats.remaining}</Badge>
+                              <Badge variant="outline" className="text-teal-600 font-bold">Used: {stats.approved}</Badge>
+                              <Badge variant="outline" className="font-bold">Rem: {stats.remaining}</Badge>
                             </div>
                           </button>
                           <AnimatePresence>
                             {isExpanded && (
-                              <motion.div initial={{ height: 0 }} animate={{ height: 'auto' }} exit={{ height: 0 }} className="p-4 bg-slate-50/50 border-t overflow-hidden">
-                                <div className="grid grid-cols-3 gap-4 mb-4">
-                                  <div className="p-3 bg-white border rounded">Accrued: {stats.accrued}</div>
-                                  <div className="p-3 bg-white border rounded text-teal-600 font-bold">Approved: {stats.approved}</div>
-                                  <div className="p-3 bg-white border rounded">Pending: {stats.pending}</div>
+                              <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="p-5 bg-slate-50/40 border-t overflow-hidden">
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-5">
+                                  <div className="p-4 bg-white border rounded-xl shadow-sm">
+                                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Accrued</p>
+                                    <p className="text-xl font-black">{stats.accrued}</p>
+                                  </div>
+                                  <div className="p-4 bg-white border rounded-xl shadow-sm text-teal-600">
+                                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Approved</p>
+                                    <p className="text-xl font-black">{stats.approved}</p>
+                                  </div>
+                                  <div className="p-4 bg-white border rounded-xl shadow-sm text-amber-600">
+                                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Pending</p>
+                                    <p className="text-xl font-black">{stats.pending}</p>
+                                  </div>
+                                  <div className="p-4 bg-white border rounded-xl shadow-sm text-rose-600">
+                                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Rejected</p>
+                                    <p className="text-xl font-black">{stats.rejected}</p>
+                                  </div>
                                 </div>
-                                <div className="flex justify-end"><Button variant="outline" size="sm" onClick={() => handleDownloadIndividualPDF(emp)}>PDF Report</Button></div>
+                                <div className="flex justify-end gap-3 flex-wrap">
+                                  <Button variant="outline" size="sm" className="h-8 rounded-lg font-bold gap-2 hover-elevate" onClick={() => handleDownloadIndividualPDF(emp)}><FileDown className="h-3.5 w-3.5" /> PDF</Button>
+                                  <Button variant="outline" size="sm" className="h-8 rounded-lg font-bold gap-2 hover-elevate" onClick={() => handleExportIndividualExcel(emp)}><FileSpreadsheet className="h-3.5 w-3.5" /> Excel</Button>
+                                  <Button variant="outline" size="sm" className="h-8 rounded-lg font-bold gap-2 hover-elevate" onClick={() => window.location.href=`/leave?id=${emp.id}`}>Full Profile</Button>
+                                </div>
                               </motion.div>
                             )}
                           </AnimatePresence>
