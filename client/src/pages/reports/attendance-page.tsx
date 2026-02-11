@@ -208,10 +208,11 @@ export default function AttendanceReportPage() {
       .filter(emp => {
         const dept = departments.find(d => d.id === emp.departmentId);
         const matchesUnit = selectedUnit === 'all' || (dept && dept.unitId === parseInt(selectedUnit));
+        const matchesDept = selectedDept === 'all' || emp.departmentId === parseInt(selectedDept);
         const matchesSearch = searchQuery === "" || 
           `${emp.firstName} ${emp.lastName}`.toLowerCase().includes(searchQuery.toLowerCase()) ||
           (emp.employeeId || "").toLowerCase().includes(searchQuery.toLowerCase());
-        return matchesUnit && matchesSearch;
+        return matchesUnit && matchesDept && matchesSearch;
       })
       .map(emp => {
         const stats = getDetailedAttendance(emp.id);
@@ -241,10 +242,27 @@ export default function AttendanceReportPage() {
     textContent += `Emp ID\tName\tDepartment\tPresent\tAbsent\tTotal\n`;
     textContent += "-".repeat(80) + "\n";
 
-    employees.forEach(emp => {
-      const stats = getDetailedAttendance(emp.id);
-      textContent += `${emp.employeeId || '-'}\t${emp.firstName} ${emp.lastName}\t${departments.find(d => d.id === emp.departmentId)?.name || '-'}\t${stats.present}\t${stats.absent}\t${stats.total}\n`;
-    });
+    const dataToExport = employees
+      .filter(emp => {
+        const dept = departments.find(d => d.id === emp.departmentId);
+        const matchesUnit = selectedUnit === 'all' || (dept && dept.unitId === parseInt(selectedUnit));
+        const matchesDept = selectedDept === 'all' || emp.departmentId === parseInt(selectedDept);
+        const matchesSearch = searchQuery === "" || 
+          `${emp.firstName} ${emp.lastName}`.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          (emp.employeeId || "").toLowerCase().includes(searchQuery.toLowerCase());
+        return matchesUnit && matchesDept && matchesSearch;
+      })
+      .map(emp => {
+        const stats = getDetailedAttendance(emp.id);
+        return `${emp.employeeId || '-'}\t${emp.firstName} ${emp.lastName}\t${departments.find(d => d.id === emp.departmentId)?.name || '-'}\t${stats.present}\t${stats.absent}\t${stats.total}\n`;
+      });
+
+    let textContent = `ATTENDANCE REPORT - ${selectedMonth}\n`;
+    textContent += `Unit: ${selectedUnit === 'all' ? 'All' : selectedUnit}\n`;
+    textContent += "=".repeat(80) + "\n";
+    textContent += `Emp ID\tName\tDepartment\tPresent\tAbsent\tTotal\n`;
+    textContent += "-".repeat(80) + "\n";
+    textContent += dataToExport.join("");
 
     const blob = new Blob([textContent], { type: "text/plain" });
     const url = window.URL.createObjectURL(blob);
@@ -294,6 +312,42 @@ export default function AttendanceReportPage() {
             </div>
           </div>
         </motion.div>
+
+        <div className="flex gap-4 mb-6">
+          <div className="w-64">
+            <label className="text-xs font-semibold uppercase text-slate-500 mb-1 block">Unit</label>
+            <Select value={selectedUnit} onValueChange={setSelectedUnit}>
+              <SelectTrigger>
+                <SelectValue placeholder="All Units" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Units</SelectItem>
+                {units.map(u => (
+                  <SelectItem key={u.id} value={u.id.toString()}>{u.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="w-64">
+            <label className="text-xs font-semibold uppercase text-slate-500 mb-1 block">Department</label>
+            <Select value={selectedDept} onValueChange={setSelectedDept}>
+              <SelectTrigger>
+                <SelectValue placeholder="All Departments" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Departments</SelectItem>
+                {units.find(u => u.id.toString() === selectedUnit) ? 
+                  departments.filter(d => d.unitId === parseInt(selectedUnit)).map(d => (
+                    <SelectItem key={d.id} value={d.id.toString()}>{d.name}</SelectItem>
+                  )) : 
+                  departments.map(d => (
+                    <SelectItem key={d.id} value={d.id.toString()}>{d.name}</SelectItem>
+                  ))
+                }
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {reportStats.map((stat, index) => (
