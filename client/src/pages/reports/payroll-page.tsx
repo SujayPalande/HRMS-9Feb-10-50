@@ -26,7 +26,7 @@ import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query";
 import jsPDF from "jspdf";
-import "jspdf-autotable";
+import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
 import { addCompanyHeader, addWatermark, addHRSignature, addFooter, addDocumentDate, generateReferenceNumber, addReferenceNumber } from "@/lib/pdf-utils";
 import { User, Department, Unit } from "@shared/schema";
@@ -142,12 +142,19 @@ export default function PayrollReportPage() {
           head: [['Emp ID', 'Name', 'Department', 'Amount']],
           body: tableData,
           startY: 70,
-          headStyles: { fillStyle: 'F', fillColor: [15, 23, 42] },
+          headStyles: { fillColor: [15, 23, 42] },
           alternateRowStyles: { fillColor: [245, 247, 250] },
           margin: { top: 70 }
         });
       } else {
-        throw new Error("autoTable plugin not loaded");
+        autoTable(doc, {
+          head: [['Emp ID', 'Name', 'Department', 'Amount']],
+          body: tableData,
+          startY: 70,
+          headStyles: { fillColor: [15, 23, 42] },
+          alternateRowStyles: { fillColor: [245, 247, 250] },
+          margin: { top: 70 }
+        });
       }
 
       addFooter(doc);
@@ -178,7 +185,7 @@ export default function PayrollReportPage() {
       const payroll = getDetailedPayroll(emp.id);
       const dept = departments.find(d => d.id === emp.departmentId);
 
-      doc.autoTable({
+      const options = {
         startY: 70,
         head: [['Payroll Detail', 'Information']],
         body: [
@@ -194,10 +201,16 @@ export default function PayrollReportPage() {
         ],
         headStyles: { fillColor: [15, 23, 42] },
         theme: 'striped'
-      });
+      };
+
+      if (doc.autoTable) {
+        doc.autoTable(options);
+      } else {
+        autoTable(doc, options);
+      }
 
       addFooter(doc);
-      addHRSignature(doc, doc.lastAutoTable.finalY + 20);
+      addHRSignature(doc, (doc as any).lastAutoTable?.finalY || 150 + 20);
       const refNumber = generateReferenceNumber("IND-PAY");
       addReferenceNumber(doc, refNumber, 68);
       addDocumentDate(doc, undefined, 68);

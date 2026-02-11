@@ -26,7 +26,7 @@ import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query";
 import jsPDF from "jspdf";
-import "jspdf-autotable";
+import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
 import { addCompanyHeader, addWatermark, addHRSignature, addFooter, addDocumentDate, generateReferenceNumber, addReferenceNumber } from "@/lib/pdf-utils";
 import { User, Department, Unit } from "@shared/schema";
@@ -131,12 +131,19 @@ export default function LeaveReportPage() {
           head: [['Emp ID', 'Name', 'Department', 'Approved', 'Pending', 'Remaining']],
           body: tableData,
           startY: 70,
-          headStyles: { fillStyle: 'F', fillColor: [15, 23, 42] },
+          headStyles: { fillColor: [15, 23, 42] },
           alternateRowStyles: { fillColor: [245, 247, 250] },
           margin: { top: 70 }
         });
       } else {
-        throw new Error("autoTable plugin not loaded");
+        autoTable(doc, {
+          head: [['Emp ID', 'Name', 'Department', 'Approved', 'Pending', 'Remaining']],
+          body: tableData,
+          startY: 70,
+          headStyles: { fillColor: [15, 23, 42] },
+          alternateRowStyles: { fillColor: [245, 247, 250] },
+          margin: { top: 70 }
+        });
       }
 
       addFooter(doc);
@@ -167,7 +174,7 @@ export default function LeaveReportPage() {
       const stats = getDetailedLeaveStats(emp.id);
       const dept = departments.find(d => d.id === emp.departmentId);
 
-      doc.autoTable({
+      const options = {
         startY: 70,
         head: [['Leave Metric', 'Value']],
         body: [
@@ -185,10 +192,16 @@ export default function LeaveReportPage() {
         ],
         headStyles: { fillColor: [15, 23, 42] },
         theme: 'striped'
-      });
+      };
+
+      if (doc.autoTable) {
+        doc.autoTable(options);
+      } else {
+        autoTable(doc, options);
+      }
 
       addFooter(doc);
-      addHRSignature(doc, doc.lastAutoTable.finalY + 20);
+      addHRSignature(doc, (doc as any).lastAutoTable?.finalY || 150 + 20);
       const refNumber = generateReferenceNumber("IND-LVE");
       addReferenceNumber(doc, refNumber, 68);
       addDocumentDate(doc, undefined, 68);
@@ -416,7 +429,7 @@ export default function LeaveReportPage() {
                                       <Button variant="outline" size="sm" className="gap-2" onClick={() => handleDownloadIndividualPDF(emp)}>
                                         <FileDown className="h-4 w-4" /> Download PDF
                                       </Button>
-                                      <Button variant="outline" size="sm" onClick={() => window.location.href=`/employee/${emp.id}`}>
+                                      <Button variant="outline" size="sm" onClick={() => window.location.href=`/leave?id=${emp.id}`}>
                                         Full Profile History
                                       </Button>
                                     </div>
