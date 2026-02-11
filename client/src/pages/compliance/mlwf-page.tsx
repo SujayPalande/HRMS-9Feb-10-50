@@ -26,7 +26,7 @@ export default function MlwfPage() {
     return employees
       .filter(emp => emp.isActive && emp.salary && emp.salary > 0)
       .map(emp => {
-        const grossSalary = Math.round(emp.salary! / 12);
+        const grossSalary = emp.salary! ; // Using salary field directly as gross salary
         // Half-yearly (June & December): Employee Rs 25, Employer Rs 75
         const currentMonth = new Date().getMonth() + 1;
         const isMlwfMonth = currentMonth === 6 || currentMonth === 12;
@@ -38,7 +38,8 @@ export default function MlwfPage() {
           grossSalary,
           employeeContrib,
           employerContrib,
-          total: employeeContrib + employerContrib
+          total: employeeContrib + employerContrib,
+          isMlwfMonth
         };
       });
   }, [employees]);
@@ -140,8 +141,14 @@ export default function MlwfPage() {
                     <tr key={index} className="border-b hover:bg-slate-50">
                       <td className="py-3 px-4 font-medium">{row.employee}</td>
                       <td className="py-3 px-4">₹{row.grossSalary.toLocaleString()}</td>
-                      <td className="py-3 px-4">₹{row.employeeContrib}</td>
-                      <td className="py-3 px-4">₹{row.employerContrib}</td>
+                      <td className="py-3 px-4">
+                        ₹{row.employeeContrib}
+                        {row.isMlwfMonth && <span className="text-[10px] text-slate-400 block">(Half-yearly)</span>}
+                      </td>
+                      <td className="py-3 px-4">
+                        ₹{row.employerContrib}
+                        {row.isMlwfMonth && <span className="text-[10px] text-slate-400 block">(Half-yearly)</span>}
+                      </td>
                       <td className="py-3 px-4 font-medium text-teal-600">₹{row.total}</td>
                     </tr>
                   ))}

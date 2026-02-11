@@ -272,3 +272,4 @@
 [x] 272. Applied database schema using drizzle-kit push - February 11, 2026
 [x] 273. Restarted workflow and verified application running successfully on port 5000 - February 11, 2026
 [x] 274. ALL MIGRATION TASKS COMPLETE: Application successfully running on port 5000 - February 11, 2026
+[x] 275. Fixed MLWF gross salary calculation and half-yearly deductions logic - February 11, 2026

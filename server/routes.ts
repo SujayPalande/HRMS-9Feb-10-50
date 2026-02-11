@@ -135,7 +135,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const esicEmployer = gross <= 21000 ? Math.round(gross * 0.0325) : 0;
       
       const pt = 200;
-      const lwf = 25;
+      
+      // MLWF - Half yearly (June & December only) - Employee: 25, Employer: 75
+      const currentMonth = new Date().getMonth() + 1;
+      const isMlwfMonth = currentMonth === 6 || currentMonth === 12;
+      const lwf = isMlwfMonth ? 25 : 0;
       
       const totalDeductions = epfEmployee + esicEmployee + pt + lwf;
       const netSalary = gross - totalDeductions;
