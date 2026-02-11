@@ -44,6 +44,18 @@ export default function PayrollReportPage() {
   const { data: departments = [] } = useQuery<Department[]>({ queryKey: ["/api/departments"] });
   const { data: paymentRecords = [] } = useQuery<any[]>({ queryKey: ["/api/payroll/payments"] });
 
+  const filteredEmployees = useMemo(() => {
+    return employees.filter(emp => {
+      const dept = departments.find(d => d.id === emp.departmentId);
+      const matchesUnit = selectedUnit === 'all' || (dept && dept.unitId === parseInt(selectedUnit));
+      const matchesDept = selectedDept === 'all' || emp.departmentId === parseInt(selectedDept);
+      const matchesSearch = searchQuery === "" || 
+        `${emp.firstName} ${emp.lastName}`.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (emp.employeeId || "").toLowerCase().includes(searchQuery.toLowerCase());
+      return matchesUnit && matchesDept && matchesSearch;
+    });
+  }, [employees, departments, selectedUnit, selectedDept, searchQuery]);
+
   const toggleEmployee = (empId: number) => {
     const newSet = new Set(expandedEmployees);
     if (newSet.has(empId)) newSet.delete(empId);
