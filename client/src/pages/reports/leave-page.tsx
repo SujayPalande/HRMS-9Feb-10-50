@@ -131,8 +131,8 @@ export default function LeaveReportPage() {
           head: [['Emp ID', 'Name', 'Department', 'Approved', 'Pending', 'Remaining']],
           body: tableData,
           startY: 70,
-          headStyles: { fillColor: [15, 23, 42] },
-          alternateRowStyles: { fillColor: [245, 247, 250] },
+          headStyles: { fillColor: [15, 23, 42] as [number, number, number] },
+          alternateRowStyles: { fillColor: [245, 247, 250] as [number, number, number] },
           margin: { top: 70 }
         });
       } else {
@@ -140,8 +140,8 @@ export default function LeaveReportPage() {
           head: [['Emp ID', 'Name', 'Department', 'Approved', 'Pending', 'Remaining']],
           body: tableData,
           startY: 70,
-          headStyles: { fillColor: [15, 23, 42] },
-          alternateRowStyles: { fillColor: [245, 247, 250] },
+          headStyles: { fillColor: [15, 23, 42] as [number, number, number] },
+          alternateRowStyles: { fillColor: [245, 247, 250] as [number, number, number] },
           margin: { top: 70 }
         });
       }
@@ -190,8 +190,8 @@ export default function LeaveReportPage() {
           ['Sick (Approved)', stats.byType.sick.toString()],
           ['Personal (Approved)', stats.byType.personal.toString()],
         ],
-        headStyles: { fillColor: [15, 23, 42] },
-        theme: 'striped'
+        headStyles: { fillColor: [15, 23, 42] as [number, number, number] },
+        theme: 'striped' as const
       };
 
       if (doc.autoTable) {

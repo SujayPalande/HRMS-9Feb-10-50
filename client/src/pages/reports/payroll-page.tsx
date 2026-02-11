@@ -142,8 +142,8 @@ export default function PayrollReportPage() {
           head: [['Emp ID', 'Name', 'Department', 'Amount']],
           body: tableData,
           startY: 70,
-          headStyles: { fillColor: [15, 23, 42] },
-          alternateRowStyles: { fillColor: [245, 247, 250] },
+          headStyles: { fillColor: [15, 23, 42] as [number, number, number] },
+          alternateRowStyles: { fillColor: [245, 247, 250] as [number, number, number] },
           margin: { top: 70 }
         });
       } else {
@@ -151,8 +151,8 @@ export default function PayrollReportPage() {
           head: [['Emp ID', 'Name', 'Department', 'Amount']],
           body: tableData,
           startY: 70,
-          headStyles: { fillColor: [15, 23, 42] },
-          alternateRowStyles: { fillColor: [245, 247, 250] },
+          headStyles: { fillColor: [15, 23, 42] as [number, number, number] },
+          alternateRowStyles: { fillColor: [245, 247, 250] as [number, number, number] },
           margin: { top: 70 }
         });
       }
@@ -199,8 +199,8 @@ export default function PayrollReportPage() {
           ['Payment Date', payroll.lastPaymentDate ? new Date(payroll.lastPaymentDate).toLocaleDateString() : 'N/A'],
           ['Payment Mode', payroll.lastPaymentMode || 'N/A'],
         ],
-        headStyles: { fillColor: [15, 23, 42] },
-        theme: 'striped'
+        headStyles: { fillColor: [15, 23, 42] as [number, number, number] },
+        theme: 'striped' as const
       };
 
       if (doc.autoTable) {

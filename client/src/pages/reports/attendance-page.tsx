@@ -127,8 +127,8 @@ export default function AttendanceReportPage() {
           head: [['Emp ID', 'Name', 'Department', 'Present', 'Absent', 'Half Day', 'Late', 'Total Days']],
           body: tableData,
           startY: 70,
-          headStyles: { fillColor: [15, 23, 42] },
-          alternateRowStyles: { fillColor: [245, 247, 250] },
+          headStyles: { fillColor: [15, 23, 42] as [number, number, number] },
+          alternateRowStyles: { fillColor: [245, 247, 250] as [number, number, number] },
           margin: { top: 70 }
         });
       } else {
@@ -136,8 +136,8 @@ export default function AttendanceReportPage() {
           head: [['Emp ID', 'Name', 'Department', 'Present', 'Absent', 'Half Day', 'Late', 'Total Days']],
           body: tableData,
           startY: 70,
-          headStyles: { fillColor: [15, 23, 42] },
-          alternateRowStyles: { fillColor: [245, 247, 250] },
+          headStyles: { fillColor: [15, 23, 42] as [number, number, number] },
+          alternateRowStyles: { fillColor: [245, 247, 250] as [number, number, number] },
           margin: { top: 70 }
         });
       }
@@ -180,8 +180,8 @@ export default function AttendanceReportPage() {
           ['Late Arrivals', stats.late.toString()],
           ['Total Recorded Days', (stats.present + stats.absent + stats.halfday).toString()],
         ],
-        headStyles: { fillColor: [15, 23, 42] },
-        theme: 'striped'
+        headStyles: { fillColor: [15, 23, 42] as [number, number, number] },
+        theme: 'striped' as const
       };
 
       if (doc.autoTable) {
