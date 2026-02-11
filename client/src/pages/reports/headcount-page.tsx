@@ -70,10 +70,10 @@ export default function HeadcountReportPage() {
   };
 
   const headcountStats = [
-    { title: "Total Headcount", value: employees.length.toString(), icon: <Users className="h-5 w-5" />, color: "bg-teal-50 text-teal-600 dark:bg-teal-950 dark:text-teal-400" },
-    { title: "New Hires", value: "18", icon: <UserPlus className="h-5 w-5" />, color: "bg-green-50 text-green-600 dark:bg-green-950 dark:text-green-400" },
-    { title: "Separations", value: "6", icon: <UserMinus className="h-5 w-5" />, color: "bg-red-50 text-red-600 dark:bg-red-950 dark:text-red-400" },
-    { title: "Growth Rate", value: "8.3%", icon: <TrendingUp className="h-5 w-5" />, color: "bg-blue-50 text-blue-600 dark:bg-blue-950 dark:text-blue-400" },
+    { title: "Total Headcount", value: employees.length.toString(), icon: <Users className="h-6 w-6" />, color: "bg-teal-50 text-teal-600 dark:bg-teal-900/30 dark:text-teal-400" },
+    { title: "New Hires", value: "18", icon: <UserPlus className="h-6 w-6" />, color: "bg-emerald-50 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400" },
+    { title: "Separations", value: "6", icon: <UserMinus className="h-6 w-6" />, color: "bg-rose-50 text-rose-600 dark:bg-rose-900/30 dark:text-rose-400" },
+    { title: "Growth Rate", value: "8.3%", icon: <TrendingUp className="h-6 w-6" />, color: "bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400" },
   ];
 
   const handleExportPDF = () => {

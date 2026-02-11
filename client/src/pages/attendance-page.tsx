@@ -215,7 +215,7 @@ export default function AttendancePage() {
                   </div>
                 </div>
                 <div className="h-10 w-px bg-slate-700" />
-                <CheckButton />
+                <CheckButton currentAttendance={todayRecord} />
               </motion.div>
             </div>
           </div>

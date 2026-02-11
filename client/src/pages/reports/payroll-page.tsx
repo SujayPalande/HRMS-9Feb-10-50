@@ -57,9 +57,12 @@ export default function PayrollReportPage() {
   );
 
   const getDetailedPayroll = (userId: number) => {
-    // Sync logic: If actual payment records exist, use them. 
-    // Otherwise, show the employee's base salary from their profile if it matches the filter
+    // Sync logic: Use payment records for the selected month
     const records = paymentRecords.filter(r => r.employeeId === userId && r.month === selectedMonth);
+    const emp = employees.find(e => e.id === userId);
+    
+    // Calculate expected amount based on employee salary if no record exists
+    const baseAmount = emp?.salary || 0;
     
     if (records.length > 0) {
       const totalAmount = records.reduce((sum, r) => sum + r.amount, 0);
@@ -69,18 +72,18 @@ export default function PayrollReportPage() {
         count: records.length,
         lastPaymentDate: lastPayment?.paymentDate,
         lastPaymentMode: lastPayment?.paymentMode,
-        lastRefNo: lastPayment?.referenceNo
+        lastRefNo: lastPayment?.referenceNo,
+        isSynced: true
       };
     }
 
-    // Fallback to profile salary for reporting purposes if no payment record exists yet
-    const emp = employees.find(e => e.id === userId);
     return {
-      totalAmount: emp?.salary || 0,
+      totalAmount: baseAmount,
       count: 0,
       lastPaymentDate: null,
       lastPaymentMode: null,
-      lastRefNo: null
+      lastRefNo: null,
+      isSynced: false
     };
   };
 
@@ -102,10 +105,10 @@ export default function PayrollReportPage() {
   }).length;
 
   const payrollStats = [
-    { title: "Total Payroll (Month)", value: `₹${totalMonthlyPayroll.toLocaleString()}`, icon: <IndianRupee className="h-5 w-5" />, color: "bg-teal-50 text-teal-600 dark:bg-teal-950 dark:text-teal-400" },
-    { title: "Units", value: units.length.toString(), icon: <Building2 className="h-5 w-5" />, color: "bg-blue-50 text-blue-600 dark:bg-blue-950 dark:text-blue-400" },
-    { title: "Departments", value: departments.length.toString(), icon: <Users className="h-5 w-5" />, color: "bg-green-50 text-green-600 dark:bg-green-950 dark:text-green-400" },
-    { title: "Employees Processed", value: employeesPaidCount.toString(), icon: <Users className="h-5 w-5" />, color: "bg-blue-50 text-blue-600 dark:bg-blue-950 dark:text-blue-400" },
+    { title: "Total Payroll", value: `₹${totalMonthlyPayroll.toLocaleString()}`, icon: <IndianRupee className="h-6 w-6" />, color: "bg-teal-50 text-teal-600 dark:bg-teal-900/30 dark:text-teal-400" },
+    { title: "Units", value: units.length.toString(), icon: <Building2 className="h-6 w-6" />, color: "bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400" },
+    { title: "Departments", value: departments.length.toString(), icon: <IndianRupee className="h-6 w-6" />, color: "bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400" },
+    { title: "Employees Paid", value: employeesPaidCount.toString(), icon: <Users className="h-6 w-6" />, color: "bg-emerald-50 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400" },
   ];
 
   const handleExportPDF = () => {

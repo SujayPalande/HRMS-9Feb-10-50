@@ -135,29 +135,26 @@ export function CheckButton({ currentAttendance }: CheckButtonProps) {
       {canCheckIn ? (
         <Button 
           onClick={handleCheckIn}
-          className="bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white shadow-lg hover:shadow-xl transition-all duration-200 font-semibold px-6 py-3 border-0"
+          className="bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white shadow-lg hover:shadow-xl transition-all duration-200 font-semibold px-8 py-4 text-lg border-0 rounded-2xl h-auto"
           disabled={checkInMutation.isPending}
-          size="lg"
         >
           {checkInMutation.isPending ? (
-            <Loader2 className="mr-3 h-5 w-5 animate-spin" />
+            <Loader2 className="mr-3 h-6 w-6 animate-spin" />
           ) : (
-            <LogIn className="mr-3 h-5 w-5" />
+            <LogIn className="mr-3 h-6 w-6" />
           )}
           Check In
         </Button>
       ) : (
         <Button 
           onClick={handleCheckOut}
-          variant="outline"
-          className="border-2 border-red-500 text-red-600 hover:bg-red-50 hover:border-red-600 shadow-lg hover:shadow-xl transition-all duration-200 font-semibold px-6 py-3 bg-white"
+          className="bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-white shadow-lg hover:shadow-xl transition-all duration-200 font-semibold px-8 py-4 text-lg border-0 rounded-2xl h-auto"
           disabled={checkOutMutation.isPending || isCheckedOut}
-          size="lg"
         >
           {checkOutMutation.isPending ? (
-            <Loader2 className="mr-3 h-5 w-5 animate-spin" />
+            <Loader2 className="mr-3 h-6 w-6 animate-spin" />
           ) : (
-            <LogOut className="mr-3 h-5 w-5" />
+            <LogOut className="mr-3 h-6 w-6" />
           )}
           {isCheckedOut ? "Checked Out" : "Check Out"}
         </Button>
