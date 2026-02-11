@@ -22,7 +22,7 @@ import {
   FileDown
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query";
 import jsPDF from "jspdf";
@@ -45,7 +45,7 @@ export default function PayrollReportPage() {
   const { data: paymentRecords = [] } = useQuery<any[]>({ queryKey: ["/api/payroll/payments"] });
 
   const filteredEmployees = useMemo(() => {
-    return employees.filter(emp => {
+    return employees.filter((emp: User) => {
       const dept = departments.find(d => d.id === emp.departmentId);
       const matchesUnit = selectedUnit === 'all' || (dept && dept.unitId === parseInt(selectedUnit));
       const matchesDept = selectedDept === 'all' || emp.departmentId === parseInt(selectedDept);
@@ -63,20 +63,10 @@ export default function PayrollReportPage() {
     setExpandedEmployees(newSet);
   };
 
-  const filteredDepartments = departments.filter(d => 
+  const filteredDepartments = departments.filter((d: Department) => 
     (selectedUnit === "all" || d.unitId === parseInt(selectedUnit)) &&
     (selectedDept === "all" || d.id === parseInt(selectedDept))
   );
-
-  const filteredEmployees = employees.filter(emp => {
-    const dept = departments.find(d => d.id === emp.departmentId);
-    const matchesUnit = selectedUnit === 'all' || (dept && dept.unitId === parseInt(selectedUnit));
-    const matchesDept = selectedDept === 'all' || emp.departmentId === parseInt(selectedDept);
-    const matchesSearch = searchQuery === "" || 
-      `${emp.firstName} ${emp.lastName}`.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (emp.employeeId || "").toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesUnit && matchesDept && matchesSearch;
-  });
 
   const getDetailedPayroll = (userId: number) => {
     const records = paymentRecords.filter(r => r.employeeId === userId && r.month === selectedMonth);
@@ -84,7 +74,7 @@ export default function PayrollReportPage() {
     const baseAmount = emp?.salary || 0;
     
     if (records.length > 0) {
-      const totalAmount = records.reduce((sum, r) => sum + r.amount, 0);
+      const totalAmount = records.reduce((sum, r) => sum + (r.amount || 0), 0);
       const lastPayment = records.sort((a, b) => new Date(b.paymentDate).getTime() - new Date(a.paymentDate).getTime())[0];
       return { 
         totalAmount, 
@@ -106,8 +96,8 @@ export default function PayrollReportPage() {
     };
   };
 
-  const totalMonthlyPayroll = filteredEmployees.reduce((sum, emp) => sum + getDetailedPayroll(emp.id).totalAmount, 0);
-  const employeesPaidCount = filteredEmployees.filter(emp => getDetailedPayroll(emp.id).count > 0).length;
+  const totalMonthlyPayroll = filteredEmployees.reduce((sum: number, emp: User) => sum + getDetailedPayroll(emp.id).totalAmount, 0);
+  const employeesPaidCount = filteredEmployees.filter((emp: User) => getDetailedPayroll(emp.id).count > 0).length;
 
   const payrollStats = [
     { title: "Total Payroll", value: `₹${totalMonthlyPayroll.toLocaleString()}`, icon: <IndianRupee className="h-6 w-6" />, color: "bg-teal-50 text-teal-600 dark:bg-teal-900/30 dark:text-teal-400" },

@@ -22,7 +22,7 @@ import {
   FileDown
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query";
 import jsPDF from "jspdf";
@@ -43,8 +43,20 @@ export default function HeadcountReportPage() {
   const { data: employees = [] } = useQuery<User[]>({ queryKey: ["/api/employees"] });
   const { data: departments = [] } = useQuery<Department[]>({ queryKey: ["/api/departments"] });
 
+  const toggleEmployee = (empId: number) => {
+    const newSet = new Set(expandedEmployees);
+    if (newSet.has(empId)) newSet.delete(empId);
+    else newSet.add(empId);
+    setExpandedEmployees(newSet);
+  };
+
+  const filteredDepartments = departments.filter((d: Department) => 
+    (selectedUnit === "all" || d.unitId === parseInt(selectedUnit)) &&
+    (selectedDept === "all" || d.id === parseInt(selectedDept))
+  );
+
   const filteredEmployees = useMemo(() => {
-    return employees.filter(emp => {
+    return employees.filter((emp: User) => {
       const dept = departments.find(d => d.id === emp.departmentId);
       const matchesUnit = selectedUnit === 'all' || (dept && dept.unitId === parseInt(selectedUnit));
       const matchesDept = selectedDept === 'all' || emp.departmentId === parseInt(selectedDept);
@@ -54,28 +66,6 @@ export default function HeadcountReportPage() {
       return matchesUnit && matchesDept && matchesSearch;
     });
   }, [employees, departments, selectedUnit, selectedDept, searchQuery]);
-
-  const toggleEmployee = (empId: number) => {
-    const newSet = new Set(expandedEmployees);
-    if (newSet.has(empId)) newSet.delete(empId);
-    else newSet.add(empId);
-    setExpandedEmployees(newSet);
-  };
-
-  const filteredDepartments = departments.filter(d => 
-    (selectedUnit === "all" || d.unitId === parseInt(selectedUnit)) &&
-    (selectedDept === "all" || d.id === parseInt(selectedDept))
-  );
-
-  const filteredEmployees = employees.filter(emp => {
-    const dept = departments.find(d => d.id === emp.departmentId);
-    const matchesUnit = selectedUnit === 'all' || (dept && dept.unitId === parseInt(selectedUnit));
-    const matchesDept = selectedDept === 'all' || emp.departmentId === parseInt(selectedDept);
-    const matchesSearch = searchQuery === "" || 
-      `${emp.firstName} ${emp.lastName}`.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (emp.employeeId || "").toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesUnit && matchesDept && matchesSearch;
-  });
 
   const getTenure = (joinDate: string | Date | null) => {
     if (!joinDate) return "N/A";

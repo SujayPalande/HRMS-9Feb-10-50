@@ -18,7 +18,7 @@ import {
   FileDown
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query";
 import jsPDF from "jspdf";
@@ -41,7 +41,7 @@ export default function LeaveReportPage() {
   const { data: leaveRequests = [] } = useQuery<any[]>({ queryKey: ["/api/leave-requests"] });
 
   const filteredEmployees = useMemo(() => {
-    return employees.filter(emp => {
+    return employees.filter((emp: User) => {
       const dept = departments.find(d => d.id === emp.departmentId);
       const matchesUnit = selectedUnit === 'all' || (dept && dept.unitId === parseInt(selectedUnit));
       const matchesDept = selectedDept === 'all' || emp.departmentId === parseInt(selectedDept);
@@ -59,17 +59,7 @@ export default function LeaveReportPage() {
     setExpandedEmployees(newSet);
   };
 
-  const filteredEmployees = employees.filter(emp => {
-    const dept = departments.find(d => d.id === emp.departmentId);
-    const matchesUnit = selectedUnit === 'all' || (dept && dept.unitId === parseInt(selectedUnit));
-    const matchesDept = selectedDept === 'all' || emp.departmentId === parseInt(selectedDept);
-    const matchesSearch = searchQuery === "" || 
-      `${emp.firstName} ${emp.lastName}`.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (emp.employeeId || "").toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesUnit && matchesDept && matchesSearch;
-  });
-
-  const filteredDepartments = departments.filter(d => 
+  const filteredDepartments = departments.filter((d: Department) => 
     (selectedUnit === "all" || d.unitId === parseInt(selectedUnit)) &&
     (selectedDept === "all" || d.id === parseInt(selectedDept))
   );
@@ -298,7 +288,7 @@ export default function LeaveReportPage() {
                                 <div className="flex justify-end gap-3 flex-wrap">
                                   <Button variant="outline" size="sm" className="h-8 rounded-lg font-bold gap-2 hover-elevate" onClick={() => handleDownloadIndividualPDF(emp)}><FileDown className="h-3.5 w-3.5" /> PDF</Button>
                                   <Button variant="outline" size="sm" className="h-8 rounded-lg font-bold gap-2 hover-elevate" onClick={() => handleExportIndividualExcel(emp)}><FileSpreadsheet className="h-3.5 w-3.5" /> Excel</Button>
-                                  <Button variant="outline" size="sm" className="h-8 rounded-lg font-bold gap-2 hover-elevate" onClick={() => window.location.href=`/leave?id=${emp.id}`}>Full Profile</Button>
+                                  <Button variant="outline" size="sm" className="h-8 rounded-lg font-bold hover-elevate" onClick={() => window.location.href=`/leave?id=${emp.id}`}>Full Profile</Button>
                                 </div>
                               </motion.div>
                             )}

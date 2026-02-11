@@ -18,7 +18,7 @@ import {
   FileDown
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query";
 import jsPDF from "jspdf";
@@ -40,18 +40,6 @@ export default function AttendanceReportPage() {
   const { data: departments = [] } = useQuery<Department[]>({ queryKey: ["/api/departments"] });
   const { data: attendanceRecords = [] } = useQuery<any[]>({ queryKey: ["/api/attendance"] });
 
-  const filteredEmployees = useMemo(() => {
-    return employees.filter(emp => {
-      const dept = departments.find(d => d.id === emp.departmentId);
-      const matchesUnit = selectedUnit === 'all' || (dept && dept.unitId === parseInt(selectedUnit));
-      const matchesDept = selectedDept === 'all' || emp.departmentId === parseInt(selectedDept);
-      const matchesSearch = searchQuery === "" || 
-        `${emp.firstName} ${emp.lastName}`.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (emp.employeeId || "").toLowerCase().includes(searchQuery.toLowerCase());
-      return matchesUnit && matchesDept && matchesSearch;
-    });
-  }, [employees, departments, selectedUnit, selectedDept, searchQuery]);
-
   const toggleEmployee = (empId: number) => {
     const newSet = new Set(expandedEmployees);
     if (newSet.has(empId)) newSet.delete(empId);
@@ -71,17 +59,19 @@ export default function AttendanceReportPage() {
 
   const { startDate, endDate } = getMonthData(selectedMonth);
 
-  const filteredEmployees = employees.filter(emp => {
-    const dept = departments.find(d => d.id === emp.departmentId);
-    const matchesUnit = selectedUnit === 'all' || (dept && dept.unitId === parseInt(selectedUnit));
-    const matchesDept = selectedDept === 'all' || emp.departmentId === parseInt(selectedDept);
-    const matchesSearch = searchQuery === "" || 
-      `${emp.firstName} ${emp.lastName}`.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (emp.employeeId || "").toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesUnit && matchesDept && matchesSearch;
-  });
+  const filteredEmployees = useMemo(() => {
+    return employees.filter((emp: User) => {
+      const dept = departments.find(d => d.id === emp.departmentId);
+      const matchesUnit = selectedUnit === 'all' || (dept && dept.unitId === parseInt(selectedUnit));
+      const matchesDept = selectedDept === 'all' || emp.departmentId === parseInt(selectedDept);
+      const matchesSearch = searchQuery === "" || 
+        `${emp.firstName} ${emp.lastName}`.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (emp.employeeId || "").toLowerCase().includes(searchQuery.toLowerCase());
+      return matchesUnit && matchesDept && matchesSearch;
+    });
+  }, [employees, departments, selectedUnit, selectedDept, searchQuery]);
 
-  const filteredDepartments = departments.filter(d => 
+  const filteredDepartments = departments.filter((d: Department) => 
     (selectedUnit === "all" || d.unitId === parseInt(selectedUnit)) &&
     (selectedDept === "all" || d.id === parseInt(selectedDept))
   );
@@ -102,7 +92,7 @@ export default function AttendanceReportPage() {
   };
 
   const reportStats = [
-    { title: "Total Employees", value: employees.length.toString(), icon: <Users className="h-6 w-6" />, color: "bg-teal-50 text-teal-600 dark:bg-teal-900/30 dark:text-teal-400" },
+    { title: "Total Employees", value: filteredEmployees.length.toString(), icon: <Users className="h-6 w-6" />, color: "bg-teal-50 text-teal-600 dark:bg-teal-900/30 dark:text-teal-400" },
     { title: "Units", value: units.length.toString(), icon: <Building2 className="h-6 w-6" />, color: "bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400" },
     { title: "Departments", value: departments.length.toString(), icon: <ClipboardList className="h-6 w-6" />, color: "bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400" },
     { title: "Present Today", value: attendanceRecords.filter(r => new Date(r.date).toDateString() === new Date().toDateString() && r.status === 'present').length.toString(), icon: <TrendingUp className="h-6 w-6" />, color: "bg-emerald-50 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400" },
@@ -478,7 +468,7 @@ export default function AttendanceReportPage() {
                                       <FileText className="h-3.5 w-3.5" /> Text
                                     </Button>
                                     <Button variant="outline" size="sm" className="h-8 rounded-lg text-xs font-bold gap-2 hover-elevate" onClick={() => window.location.href=`/employee/${emp.id}`}>
-                                      Full History
+                                      Full Profile
                                     </Button>
                                   </div>
                                 </motion.div>

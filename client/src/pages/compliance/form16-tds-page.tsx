@@ -30,15 +30,15 @@ export default function Form16TdsPage() {
   const [generatingIndex, setGeneratingIndex] = useState<number | null>(null);
   const [showBasicForm16Dialog, setShowBasicForm16Dialog] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [selectedUnit, setSelectedUnit] = useState("all");
+  const [selectedDept, setSelectedDept] = useState("all");
+  const [statusMap, setStatusMap] = useState<Record<number, string>>({});
   const { toast } = useToast();
 
   const { data: employees = [] } = useQuery<User[]>({ queryKey: ["/api/employees"] });
   const { data: departments = [] } = useQuery<Department[]>({ queryKey: ["/api/departments"] });
   const { data: units = [] } = useQuery<Unit[]>({ queryKey: ["/api/masters/units"] });
   const { data: payrollRecords = [] } = useQuery<any[]>({ queryKey: ["/api/payroll"] });
-
-  const [selectedUnit, setSelectedUnit] = useState("all");
-  const [selectedDept, setSelectedDept] = useState("all");
 
   const employeeTds = useMemo(() => {
     return employees
@@ -62,12 +62,12 @@ export default function Form16TdsPage() {
           pan: emp.panNo || "ABCDE1234F",
           totalIncome,
           tdsDeducted,
-          form16: "Pending",
+          form16: statusMap[emp.id] || "Pending",
           departmentName: dept?.name || "Unassigned",
           unitName: unit?.name || "Unassigned"
         };
       });
-  }, [employees, departments, units, payrollRecords, selectedUnit, selectedDept]);
+  }, [employees, departments, units, payrollRecords, selectedUnit, selectedDept, statusMap]);
 
   const [basicForm16Data, setBasicForm16Data] = useState({
     employeeName: "",
@@ -114,22 +114,15 @@ export default function Form16TdsPage() {
     { title: "Filed with Dept", value: "128", status: "success", icon: <CheckCircle className="h-5 w-5" /> },
   ];
 
-  const [statusMap, setStatusMap] = useState<Record<number, string>>({});
-
   const filteredEmployees = useMemo(() => {
-    const data = employeeTds.map(emp => ({
-      ...emp,
-      form16: statusMap[emp.id] || "Pending"
-    }));
-
-    if (!searchQuery.trim()) return data;
+    if (!searchQuery.trim()) return employeeTds;
     const query = searchQuery.toLowerCase();
-    return data.filter(
+    return employeeTds.filter(
       emp => 
         emp.employee.toLowerCase().includes(query) || 
         emp.pan.toLowerCase().includes(query)
     );
-  }, [employeeTds, searchQuery, statusMap]);
+  }, [employeeTds, searchQuery]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -139,7 +132,7 @@ export default function Form16TdsPage() {
     }
   };
 
-  const generateForm16PDF = (employee: typeof employeeTds[0]) => {
+  const generateForm16PDF = (employee: any) => {
     const doc = new jsPDF();
     const currentDate = new Date().toLocaleDateString('en-IN', { 
       day: '2-digit', 
@@ -195,7 +188,7 @@ export default function Form16TdsPage() {
       },
     });
     
-    const partAEndY = (doc as typeof doc & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY || 120;
+    const partAEndY = (doc as any).lastAutoTable?.finalY || 120;
     
     doc.setFontSize(11);
     doc.setFont("helvetica", "bold");
@@ -301,7 +294,7 @@ export default function Form16TdsPage() {
       },
     });
     
-    const partAEndY = (doc as typeof doc & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY || 120;
+    const partAEndY = (doc as any).lastAutoTable?.finalY || 120;
     
     doc.setFontSize(11);
     doc.setFont("helvetica", "bold");
@@ -351,7 +344,7 @@ export default function Form16TdsPage() {
     setGeneratingIndex(null);
   };
 
-  const handleDownloadForm16 = (employee: typeof filteredEmployees[0]) => {
+  const handleDownloadForm16 = (employee: any) => {
     generateForm16PDF(employee);
     toast({
       title: "Form 16 Downloaded",
@@ -391,7 +384,6 @@ export default function Form16TdsPage() {
 
   const handleGenerateBasicForm16 = async () => {
     const grossSalaryValue = parseInt(basicForm16Data.grossSalary) || 0;
-    const tdsValue = parseInt(basicForm16Data.tdsDeducted) || 0;
     
     if (!basicForm16Data.employeeName.trim()) {
       toast({
@@ -584,48 +576,47 @@ export default function Form16TdsPage() {
                   ) : (
                     filteredEmployees.map((row, index) => (
                       <tr key={row.id} className="border-b hover:bg-slate-50" data-testid={`row-tds-${index}`}>
-                        <td className="py-3 px-4 font-medium">{row.employee}</td>
-                        <td className="py-3 px-4 font-mono text-sm">{row.pan}</td>
-                        <td className="py-3 px-4">Rs.{row.totalIncome.toLocaleString()}</td>
-                        <td className="py-3 px-4">Rs.{row.tdsDeducted.toLocaleString()}</td>
                         <td className="py-3 px-4">
-                          <Badge className={getStatusColor(row.form16)}>{row.form16}</Badge>
+                          <div className="font-medium text-slate-900">{row.employee}</div>
+                          <div className="text-xs text-slate-500">{row.unitName} • {row.departmentName}</div>
+                        </td>
+                        <td className="py-3 px-4 text-slate-600 uppercase">{row.pan}</td>
+                        <td className="py-3 px-4 text-slate-600">Rs. {row.totalIncome.toLocaleString()}</td>
+                        <td className="py-3 px-4 text-slate-600 font-medium">Rs. {row.tdsDeducted.toLocaleString()}</td>
+                        <td className="py-3 px-4">
+                          <Badge className={getStatusColor(row.form16)}>
+                            {row.form16}
+                          </Badge>
                         </td>
                         <td className="py-3 px-4">
-                          <div className="flex gap-2">
-                            {row.form16 === "Generated" ? (
-                              <Button 
-                                size="sm" 
-                                variant="outline" 
-                                className="gap-1" 
-                                onClick={() => handleDownloadForm16(row)}
-                                data-testid={`button-download-${index}`}
-                              >
-                                <Download className="h-3 w-3" />
-                                Download
-                              </Button>
-                            ) : (
-                              <Button 
-                                size="sm" 
-                                className="gap-1" 
-                                onClick={() => handleGenerateForm16(employeeTds.findIndex(e => e.id === row.id))}
-                                disabled={generatingIndex !== null}
-                                data-testid={`button-generate-${index}`}
-                              >
-                                {generatingIndex === employeeTds.findIndex(e => e.id === row.id) ? (
-                                  <>
-                                    <Loader2 className="h-3 w-3 animate-spin" />
-                                    Generating...
-                                  </>
-                                ) : (
-                                  <>
-                                    <FileText className="h-3 w-3" />
-                                    Generate
-                                  </>
-                                )}
-                              </Button>
-                            )}
-                          </div>
+                          {row.form16 === "Generated" ? (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-blue-600 hover:text-blue-700 h-8 gap-1"
+                              onClick={() => handleDownloadForm16(row)}
+                              data-testid={`button-download-${index}`}
+                            >
+                              <Download className="h-4 w-4" />
+                              Download
+                            </Button>
+                          ) : (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-teal-600 hover:text-teal-700 h-8 gap-1"
+                              onClick={() => handleGenerateForm16(index)}
+                              disabled={generatingIndex === index}
+                              data-testid={`button-generate-${index}`}
+                            >
+                              {generatingIndex === index ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <Plus className="h-4 w-4" />
+                              )}
+                              Generate
+                            </Button>
+                          )}
                         </td>
                       </tr>
                     ))
@@ -635,231 +626,129 @@ export default function Form16TdsPage() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Basic Form 16 Dialog */}
+        <Dialog open={showBasicForm16Dialog} onOpenChange={setShowBasicForm16Dialog}>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Generate Basic Form 16</DialogTitle>
+              <DialogDescription>
+                Manually enter employee details to generate a simplified Form 16 certificate.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="employeeName">Employee Name *</Label>
+                <Input 
+                  id="employeeName" 
+                  value={basicForm16Data.employeeName} 
+                  onChange={(e) => setBasicForm16Data({...basicForm16Data, employeeName: e.target.value})}
+                  placeholder="John Doe"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="pan">Employee PAN *</Label>
+                <Input 
+                  id="pan" 
+                  value={basicForm16Data.pan} 
+                  onChange={(e) => setBasicForm16Data({...basicForm16Data, pan: e.target.value.toUpperCase()})}
+                  placeholder="ABCDE1234F"
+                  maxLength={10}
+                />
+              </div>
+              <div className="space-y-2 md:col-span-2">
+                <Label htmlFor="address">Employee Address</Label>
+                <Input 
+                  id="address" 
+                  value={basicForm16Data.address} 
+                  onChange={(e) => setBasicForm16Data({...basicForm16Data, address: e.target.value})}
+                  placeholder="123 Main St, City, State"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="assessmentYear">Assessment Year</Label>
+                <Select 
+                  value={basicForm16Data.assessmentYear} 
+                  onValueChange={(val) => setBasicForm16Data({...basicForm16Data, assessmentYear: val})}
+                >
+                  <SelectTrigger id="assessmentYear">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="2025-26">2025-26</SelectItem>
+                    <SelectItem value="2024-25">2024-25</SelectItem>
+                    <SelectItem value="2023-24">2023-24</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="grossSalary">Gross Salary (Annual) *</Label>
+                <div className="relative">
+                  <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                  <Input 
+                    id="grossSalary" 
+                    type="number"
+                    value={basicForm16Data.grossSalary} 
+                    onChange={(e) => setBasicForm16Data({...basicForm16Data, grossSalary: e.target.value})}
+                    className="pl-9"
+                    placeholder="1200000"
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="tdsDeducted">TDS Deducted (Annual) *</Label>
+                <div className="relative">
+                  <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                  <Input 
+                    id="tdsDeducted" 
+                    type="number"
+                    value={basicForm16Data.tdsDeducted} 
+                    onChange={(e) => setBasicForm16Data({...basicForm16Data, tdsDeducted: e.target.value})}
+                    className="pl-9"
+                    placeholder="120000"
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="standardDeduction">Standard Deduction</Label>
+                <Input 
+                  id="standardDeduction" 
+                  type="number"
+                  value={basicForm16Data.standardDeduction} 
+                  onChange={(e) => setBasicForm16Data({...basicForm16Data, standardDeduction: e.target.value})}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="section80C">Section 80C Deductions</Label>
+                <Input 
+                  id="section80C" 
+                  type="number"
+                  value={basicForm16Data.section80C} 
+                  onChange={(e) => setBasicForm16Data({...basicForm16Data, section80C: e.target.value})}
+                  placeholder="150000"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="section80D">Section 80D (Health Insurance)</Label>
+                <Input 
+                  id="section80D" 
+                  type="number"
+                  value={basicForm16Data.section80D} 
+                  onChange={(e) => setBasicForm16Data({...basicForm16Data, section80D: e.target.value})}
+                  placeholder="25000"
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowBasicForm16Dialog(false)}>Cancel</Button>
+              <Button onClick={handleGenerateBasicForm16} disabled={isSubmitting}>
+                {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FilePlus className="mr-2 h-4 w-4" />}
+                Generate & Download
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
-
-      <Dialog open={showBasicForm16Dialog} onOpenChange={setShowBasicForm16Dialog}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <FilePlus className="h-5 w-5 text-teal-600" />
-              Create Basic Form 16
-            </DialogTitle>
-            <DialogDescription>Fill in the details to generate a custom Form 16 certificate</DialogDescription>
-          </DialogHeader>
-          
-          <div className="space-y-6 py-4">
-            <div className="space-y-4">
-              <h3 className="font-semibold text-slate-700 border-b pb-2">Employee Details</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="employeeName">Employee Name *</Label>
-                  <Input
-                    id="employeeName"
-                    placeholder="Enter full name"
-                    value={basicForm16Data.employeeName}
-                    onChange={(e) => setBasicForm16Data(prev => ({ ...prev, employeeName: e.target.value }))}
-                    data-testid="input-employee-name"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="pan">PAN Number *</Label>
-                  <Input
-                    id="pan"
-                    placeholder="e.g., ABCDE1234F"
-                    value={basicForm16Data.pan}
-                    onChange={(e) => setBasicForm16Data(prev => ({ ...prev, pan: e.target.value.toUpperCase() }))}
-                    maxLength={10}
-                    data-testid="input-pan"
-                  />
-                </div>
-                <div className="space-y-2 md:col-span-2">
-                  <Label htmlFor="address">Address</Label>
-                  <Input
-                    id="address"
-                    placeholder="Enter employee address"
-                    value={basicForm16Data.address}
-                    onChange={(e) => setBasicForm16Data(prev => ({ ...prev, address: e.target.value }))}
-                    data-testid="input-address"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="assessmentYear">Assessment Year</Label>
-                  <Select value={basicForm16Data.assessmentYear} onValueChange={(value) => setBasicForm16Data(prev => ({ ...prev, assessmentYear: value }))}>
-                    <SelectTrigger data-testid="select-assessment-year">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="2025-26">2025-26</SelectItem>
-                      <SelectItem value="2024-25">2024-25</SelectItem>
-                      <SelectItem value="2023-24">2023-24</SelectItem>
-                      <SelectItem value="2022-23">2022-23</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              <h3 className="font-semibold text-slate-700 border-b pb-2">Employer Details</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="employerName">Employer Name</Label>
-                  <Input
-                    id="employerName"
-                    value={basicForm16Data.employerName}
-                    onChange={(e) => setBasicForm16Data(prev => ({ ...prev, employerName: e.target.value }))}
-                    data-testid="input-employer-name"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="employerTan">Employer TAN</Label>
-                  <Input
-                    id="employerTan"
-                    value={basicForm16Data.employerTan}
-                    onChange={(e) => setBasicForm16Data(prev => ({ ...prev, employerTan: e.target.value.toUpperCase() }))}
-                    data-testid="input-employer-tan"
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              <h3 className="font-semibold text-slate-700 border-b pb-2">Salary Details</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="grossSalary">Gross Salary (Rs.) *</Label>
-                  <Input
-                    id="grossSalary"
-                    type="number"
-                    placeholder="e.g., 1200000"
-                    value={basicForm16Data.grossSalary}
-                    onChange={(e) => setBasicForm16Data(prev => ({ ...prev, grossSalary: e.target.value }))}
-                    data-testid="input-gross-salary"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="basicSalary">Basic Salary (Rs.)</Label>
-                  <Input
-                    id="basicSalary"
-                    type="number"
-                    placeholder="e.g., 600000"
-                    value={basicForm16Data.basicSalary}
-                    onChange={(e) => setBasicForm16Data(prev => ({ ...prev, basicSalary: e.target.value }))}
-                    data-testid="input-basic-salary"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="hra">HRA (Rs.)</Label>
-                  <Input
-                    id="hra"
-                    type="number"
-                    placeholder="e.g., 240000"
-                    value={basicForm16Data.hra}
-                    onChange={(e) => setBasicForm16Data(prev => ({ ...prev, hra: e.target.value }))}
-                    data-testid="input-hra"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="otherAllowances">Other Allowances (Rs.)</Label>
-                  <Input
-                    id="otherAllowances"
-                    type="number"
-                    placeholder="e.g., 360000"
-                    value={basicForm16Data.otherAllowances}
-                    onChange={(e) => setBasicForm16Data(prev => ({ ...prev, otherAllowances: e.target.value }))}
-                    data-testid="input-other-allowances"
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              <h3 className="font-semibold text-slate-700 border-b pb-2">Deductions</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="standardDeduction">Standard Deduction (Rs.)</Label>
-                  <Input
-                    id="standardDeduction"
-                    type="number"
-                    value={basicForm16Data.standardDeduction}
-                    onChange={(e) => setBasicForm16Data(prev => ({ ...prev, standardDeduction: e.target.value }))}
-                    data-testid="input-standard-deduction"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="section80C">Section 80C (Rs.)</Label>
-                  <Input
-                    id="section80C"
-                    type="number"
-                    placeholder="e.g., 150000"
-                    value={basicForm16Data.section80C}
-                    onChange={(e) => setBasicForm16Data(prev => ({ ...prev, section80C: e.target.value }))}
-                    data-testid="input-section-80c"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="section80D">Section 80D (Rs.)</Label>
-                  <Input
-                    id="section80D"
-                    type="number"
-                    placeholder="e.g., 25000"
-                    value={basicForm16Data.section80D}
-                    onChange={(e) => setBasicForm16Data(prev => ({ ...prev, section80D: e.target.value }))}
-                    data-testid="input-section-80d"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="otherDeductions">Other Deductions (Rs.)</Label>
-                  <Input
-                    id="otherDeductions"
-                    type="number"
-                    placeholder="e.g., 50000"
-                    value={basicForm16Data.otherDeductions}
-                    onChange={(e) => setBasicForm16Data(prev => ({ ...prev, otherDeductions: e.target.value }))}
-                    data-testid="input-other-deductions"
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              <h3 className="font-semibold text-slate-700 border-b pb-2">Tax Details</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="tdsDeducted">TDS Deducted (Rs.) *</Label>
-                  <Input
-                    id="tdsDeducted"
-                    type="number"
-                    placeholder="e.g., 120000"
-                    value={basicForm16Data.tdsDeducted}
-                    onChange={(e) => setBasicForm16Data(prev => ({ ...prev, tdsDeducted: e.target.value }))}
-                    data-testid="input-tds-deducted"
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-          
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowBasicForm16Dialog(false)} data-testid="button-cancel-basic-form16">
-              Cancel
-            </Button>
-            <Button onClick={handleGenerateBasicForm16} disabled={isSubmitting} data-testid="button-generate-basic-form16">
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Generating...
-                </>
-              ) : (
-                <>
-                  <Download className="h-4 w-4 mr-2" />
-                  Generate & Download
-                </>
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </AppLayout>
   );
 }
