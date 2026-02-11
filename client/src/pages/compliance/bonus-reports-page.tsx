@@ -31,32 +31,50 @@ export default function BonusReportsPage() {
     return matchesUnit && matchesDept && matchesSearch;
   });
 
-  const bonusData = filteredEmployees
-    .filter(emp => emp.isActive && emp.salary && emp.salary > 0)
-    .map(emp => {
-      const basicSalary = Math.round((emp.salary! / 12) * 0.5);
-      const bonusEligibleSalary = Math.min(basicSalary, 7000);
-      const bonusAmount = Math.round((bonusEligibleSalary * 8.33 / 100) * 12);
-      return {
-        employeeId: emp.employeeId,
-        name: `${emp.firstName} ${emp.lastName}`,
-        designation: emp.position,
-        annualBonus: bonusAmount,
-        department: departments.find(d => d.id === emp.departmentId)?.name || "-"
-      };
-    });
+  const hierarchicalBonusData = useMemo(() => {
+    const data = filteredEmployees
+      .filter(emp => emp.isActive && emp.salary && emp.salary > 0)
+      .map(emp => {
+        const basicSalary = Math.round((emp.salary! / 12) * 0.5);
+        const bonusEligibleSalary = Math.min(basicSalary, 7000);
+        const bonusAmount = Math.round((bonusEligibleSalary * 8.33 / 100) * 12);
+        
+        const dept = departments.find(d => d.id === emp.departmentId);
+        const unit = units.find(u => u.id === dept?.unitId);
+        
+        return {
+          employeeId: emp.employeeId,
+          name: `${emp.firstName} ${emp.lastName}`,
+          designation: emp.position,
+          annualBonus: bonusAmount,
+          departmentName: dept?.name || "Unassigned",
+          unitName: unit?.name || "Unassigned"
+        };
+      });
 
-  const totalBonus = bonusData.reduce((sum, item) => sum + item.annualBonus, 0);
+    const hierarchical: Record<string, Record<string, typeof data>> = {};
+    data.forEach(item => {
+      if (!hierarchical[item.unitName]) hierarchical[item.unitName] = {};
+      if (!hierarchical[item.unitName][item.departmentName]) hierarchical[item.unitName][item.departmentName] = [];
+      hierarchical[item.unitName][item.departmentName].push(item);
+    });
+    return hierarchical;
+  }, [filteredEmployees, departments, units]);
+
+  const totalBonus = Object.values(hierarchicalBonusData)
+    .flatMap(depts => Object.values(depts).flat())
+    .reduce((sum, item) => sum + item.annualBonus, 0);
 
   const bonusStats = [
     { title: "Total Bonus", value: `₹${totalBonus.toLocaleString()}`, icon: <Gift className="h-6 w-6" />, color: "bg-teal-50 text-teal-600 dark:bg-teal-900/30 dark:text-teal-400" },
-    { title: "Eligible Employees", value: bonusData.length.toString(), icon: <Users className="h-6 w-6" />, color: "bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400" },
-    { title: "Avg Bonus", value: `₹${bonusData.length ? Math.round(totalBonus / bonusData.length).toLocaleString() : 0}`, icon: <TrendingUp className="h-6 w-6" />, color: "bg-emerald-50 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400" },
+    { title: "Eligible Employees", value: Object.values(hierarchicalBonusData).flatMap(depts => Object.values(depts).flat()).length.toString(), icon: <Users className="h-6 w-6" />, color: "bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400" },
+    { title: "Avg Bonus", value: `₹${totalBonus ? Math.round(totalBonus / Object.values(hierarchicalBonusData).flatMap(depts => Object.values(depts).flat()).length).toLocaleString() : 0}`, icon: <TrendingUp className="h-6 w-6" />, color: "bg-emerald-50 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400" },
     { title: "Units", value: units.length.toString(), icon: <Building2 className="h-6 w-6" />, color: "bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400" },
   ];
 
   const exportToExcel = () => {
-    const ws = XLSX.utils.json_to_sheet(bonusData);
+    const flatData = Object.values(hierarchicalBonusData).flatMap(depts => Object.values(depts).flat());
+    const ws = XLSX.utils.json_to_sheet(flatData);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Bonus Data");
     XLSX.writeFile(wb, "bonus-report.xlsx");
@@ -155,30 +173,48 @@ export default function BonusReportsPage() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b">
-                    <th className="text-left py-3 px-4 text-slate-600">Emp ID</th>
-                    <th className="text-left py-3 px-4 text-slate-600">Employee Name</th>
-                    <th className="text-left py-3 px-4 text-slate-600">Department</th>
-                    <th className="text-left py-3 px-4 text-slate-600">Designation</th>
-                    <th className="text-left py-3 px-4 text-slate-600">Annual Bonus</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {bonusData.map((row, index) => (
-                    <tr key={index} className="border-b hover:bg-slate-50 transition-colors" data-testid={`row-bonus-${index}`}>
-                      <td className="py-3 px-4 text-slate-600">{row.employeeId}</td>
-                      <td className="py-3 px-4 font-medium">{row.name}</td>
-                      <td className="py-3 px-4 text-slate-600">{row.department}</td>
-                      <td className="py-3 px-4 text-slate-600">{row.designation}</td>
-                      <td className="py-3 px-4 font-bold text-teal-600">₹{row.annualBonus.toLocaleString()}</td>
-                    </tr>
+            <div className="space-y-8">
+              {Object.entries(hierarchicalBonusData).map(([unitName, departments]) => (
+                <div key={unitName} className="space-y-4">
+                  <h2 className="text-xl font-bold text-teal-700 border-b-2 border-teal-100 pb-2 flex items-center gap-2">
+                    <Building2 className="h-5 w-5" />
+                    Unit: {unitName}
+                  </h2>
+                  
+                  {Object.entries(departments).map(([deptName, staff]) => (
+                    <div key={deptName} className="pl-4 space-y-2">
+                      <h3 className="text-lg font-semibold text-slate-700 flex items-center gap-2">
+                        <Users className="h-4 w-4" />
+                        Department: {deptName}
+                      </h3>
+                      
+                      <div className="overflow-x-auto rounded-lg border border-slate-200">
+                        <table className="w-full">
+                          <thead>
+                            <tr className="bg-slate-50 border-b">
+                              <th className="text-left py-3 px-4 text-slate-600 font-semibold">Emp ID</th>
+                              <th className="text-left py-3 px-4 text-slate-600 font-semibold">Employee Name</th>
+                              <th className="text-left py-3 px-4 text-slate-600 font-semibold">Designation</th>
+                              <th className="text-left py-3 px-4 text-slate-600 font-semibold">Annual Bonus</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {staff.map((row, index) => (
+                              <tr key={index} className="border-b hover:bg-slate-50 transition-colors">
+                                <td className="py-3 px-4 text-slate-600">{row.employeeId}</td>
+                                <td className="py-3 px-4 font-medium text-slate-900">{row.name}</td>
+                                <td className="py-3 px-4 text-slate-600">{row.designation}</td>
+                                <td className="py-3 px-4 font-bold text-teal-600">₹{row.annualBonus.toLocaleString()}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
                   ))}
-                </tbody>
-              </table>
-              {bonusData.length === 0 && (
+                </div>
+              ))}
+              {Object.keys(hierarchicalBonusData).length === 0 && (
                 <div className="text-center py-12">
                   <p className="text-slate-500">No employees found matching the current filters.</p>
                 </div>

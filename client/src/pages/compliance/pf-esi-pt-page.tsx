@@ -14,7 +14,7 @@ import { useQuery } from "@tanstack/react-query";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { addCompanyHeader, addWatermark, addHRSignature, addFooter, addDocumentDate, generateReferenceNumber, addReferenceNumber, COMPANY_NAME, COMPANY_ADDRESS } from "@/lib/pdf-utils";
-import { User } from "@shared/schema";
+import { User, Department, Unit } from "@shared/schema";
 
 export default function PfEsiPtPage() {
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
@@ -22,10 +22,28 @@ export default function PfEsiPtPage() {
   const [uploading, setUploading] = useState(false);
   const { toast } = useToast();
   
-  // Fetch real employee data
+  const { data: departments = [] } = useQuery<Department[]>({ queryKey: ["/api/departments"] });
+  const { data: units = [] } = useQuery<Unit[]>({ queryKey: ["/api/masters/units"] });
+
   const { data: employees = [], isLoading } = useQuery<User[]>({
     queryKey: ["/api/employees"],
   });
+  
+  // Grouping helper
+  const groupByHierarchy = (data: any[]) => {
+    const hierarchical: Record<string, Record<string, any[]>> = {};
+    data.forEach(item => {
+      const dept = departments.find(d => d.id === item.emp?.departmentId);
+      const unit = units.find(u => u.id === dept?.unitId);
+      const unitName = unit?.name || "Unassigned";
+      const deptName = dept?.name || "Unassigned";
+
+      if (!hierarchical[unitName]) hierarchical[unitName] = {};
+      if (!hierarchical[unitName][deptName]) hierarchical[unitName][deptName] = [];
+      hierarchical[unitName][deptName].push(item);
+    });
+    return hierarchical;
+  };
   
   // Fetch system settings for salary components
   const { data: systemSettings } = useQuery({
@@ -53,8 +71,8 @@ export default function PfEsiPtPage() {
   };
   
   // Calculate PF data from real employees
-  const pfData = useMemo(() => {
-    return employees
+  const pfHierarchical = useMemo(() => {
+    const data = employees
       .filter(emp => emp.isActive && emp.salary && emp.salary > 0)
       .map(emp => {
         const salary = emp.salary!;
@@ -65,6 +83,7 @@ export default function PfEsiPtPage() {
         const edliContrib = Math.round(basicSalary * 0.005);
         const adminCharges = Math.round(basicSalary * 0.005);
         return {
+          emp,
           employee: `${emp.firstName} ${emp.lastName}`,
           basicSalary,
           employeeContrib,
@@ -74,22 +93,24 @@ export default function PfEsiPtPage() {
           total: employeeContrib + employerContrib + edliContrib + adminCharges
         };
       });
-  }, [employees, salaryComponents]);
+    return groupByHierarchy(data);
+  }, [employees, salaryComponents, departments, units]);
   
-  // Calculate ESI data - Only for employees with gross salary <= 21000/month
-  const esiData = useMemo(() => {
-    return employees
+  // Calculate ESI data
+  const esiHierarchical = useMemo(() => {
+    const data = employees
       .filter(emp => {
         if (!emp.isActive || !emp.salary || emp.salary <= 0) return false;
         const monthlySalary = emp.salary / 12;
-        return monthlySalary <= 21000; // ESI limit
+        return monthlySalary <= 21000; 
       })
       .map(emp => {
         const salary = emp.salary!;
         const grossSalary = Math.round(salary / 12);
-        const employeeContrib = Math.round(grossSalary * 0.0075); // 0.75%
-        const employerContrib = Math.round(grossSalary * 0.0325); // 3.25%
+        const employeeContrib = Math.round(grossSalary * 0.0075); 
+        const employerContrib = Math.round(grossSalary * 0.0325); 
         return {
+          emp,
           employee: `${emp.firstName} ${emp.lastName}`,
           grossSalary,
           employeeContrib,
@@ -97,45 +118,53 @@ export default function PfEsiPtPage() {
           total: employeeContrib + employerContrib
         };
       });
-  }, [employees]);
+    return groupByHierarchy(data);
+  }, [employees, departments, units]);
   
-  // Calculate PT data from real employees
-  const ptData = useMemo(() => {
-    return employees
+  // Calculate PT data
+  const ptHierarchical = useMemo(() => {
+    const data = employees
       .filter(emp => emp.isActive && emp.salary && emp.salary > 0)
       .map(emp => {
         const salary = emp.salary!;
         const grossSalary = Math.round(salary / 12);
-        // PT varies by state - using Maharashtra default (200)
-        // PT amount based on salary slab
-        let ptAmount = 200; // Default for high salary
+        let ptAmount = 200; 
         if (grossSalary < 10000) ptAmount = 0;
         else if (grossSalary < 15000) ptAmount = 150;
         else if (grossSalary < 25000) ptAmount = 175;
         
         return {
+          emp,
           employee: `${emp.firstName} ${emp.lastName}`,
           grossSalary,
           ptAmount,
           state: "Maharashtra"
         };
       });
-  }, [employees]);
+    return groupByHierarchy(data);
+  }, [employees, departments, units]);
   
   // Calculate compliance stats from real data
   const complianceStats = useMemo(() => {
-    const totalPF = pfData.reduce((sum, row) => sum + row.total, 0);
-    const totalESI = esiData.reduce((sum, row) => sum + row.total, 0);
-    const totalPT = ptData.reduce((sum, row) => sum + row.ptAmount, 0);
-    const eligibleCount = pfData.length;
+    const flatten = (hierarchical: Record<string, Record<string, any[]>>) => 
+      Object.values(hierarchical).flatMap(depts => Object.values(depts).flat());
+    
+    const pfFlat = flatten(pfHierarchical);
+    const esiFlat = flatten(esiHierarchical);
+    const ptFlat = flatten(ptHierarchical);
+    
+    const totalPF = pfFlat.reduce((sum, row) => sum + row.total, 0);
+    const totalESI = esiFlat.reduce((sum, row) => sum + row.total, 0);
+    const totalPT = ptFlat.reduce((sum, row) => sum + row.ptAmount, 0);
+    const eligibleCount = pfFlat.length;
     
     return [
       { title: "Total PF Contribution", value: `₹${totalPF.toLocaleString()}`, change: `${eligibleCount} emp`, icon: <IndianRupee className="h-5 w-5" /> },
-      { title: "ESI Contribution", value: `₹${totalESI.toLocaleString()}`, change: `${esiData.length} emp`, icon: <Building2 className="h-5 w-5" /> },
-      { title: "PT Collected", value: `₹${totalPT.toLocaleString()}`, change: `${ptData.length} emp`, icon: <Calculator className="h-5 w-5" /> },
+      { title: "ESI Contribution", value: `₹${totalESI.toLocaleString()}`, change: `${esiFlat.length} emp`, icon: <Building2 className="h-5 w-5" /> },
+      { title: "PT Collected", value: `₹${totalPT.toLocaleString()}`, change: `${ptFlat.length} emp`, icon: <Calculator className="h-5 w-5" /> },
       { title: "Eligible Employees", value: `${eligibleCount}`, change: "Active", icon: <Users className="h-5 w-5" /> },
     ];
-  }, [pfData, esiData, ptData]);
+  }, [pfHierarchical, esiHierarchical, ptHierarchical]);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -185,10 +214,10 @@ export default function PfEsiPtPage() {
     
     doc.setFont("helvetica", "normal");
     doc.setFontSize(10);
-    doc.text(`Total PF Contribution: Rs. 12,45,000`, 25, 88);
-    doc.text(`Total ESI Contribution: Rs. 3,45,000`, 25, 96);
-    doc.text(`Total PT Collected: Rs. 89,500`, 25, 104);
-    doc.text(`Eligible Employees: 156`, 25, 112);
+    doc.text(`Total PF Contribution: Rs. ${Object.values(pfHierarchical).flatMap(d => Object.values(d).flat()).reduce((s, r) => s + r.total, 0).toLocaleString()}`, 25, 88);
+    doc.text(`Total ESI Contribution: Rs. ${Object.values(esiHierarchical).flatMap(d => Object.values(d).flat()).reduce((s, r) => s + r.total, 0).toLocaleString()}`, 25, 96);
+    doc.text(`Total PT Collected: Rs. ${Object.values(ptHierarchical).flatMap(d => Object.values(d).flat()).reduce((s, r) => s + r.ptAmount, 0).toLocaleString()}`, 25, 104);
+    doc.text(`Eligible Employees: ${Object.values(pfHierarchical).flatMap(d => Object.values(d).flat()).length}`, 25, 112);
     
     doc.setFontSize(11);
     doc.setFont("helvetica", "bold");
@@ -197,7 +226,7 @@ export default function PfEsiPtPage() {
     autoTable(doc, {
       startY: 130,
       head: [['Employee', 'Basic Salary', 'Employee (12%)', 'Employer (12%)', 'EDLI (0.5%)', 'Admin (0.5%)', 'Total']],
-      body: pfData.map(row => [
+      body: Object.values(pfHierarchical).flatMap(depts => Object.values(depts).flat()).map(row => [
         row.employee,
         `Rs. ${row.basicSalary.toLocaleString()}`,
         `Rs. ${row.employeeContrib.toLocaleString()}`,
@@ -220,7 +249,7 @@ export default function PfEsiPtPage() {
     autoTable(doc, {
       startY: pfEndY + 16,
       head: [['Employee', 'Gross Salary', 'Employee (0.75%)', 'Employer (3.25%)', 'Total']],
-      body: esiData.map(row => [
+      body: Object.values(esiHierarchical).flatMap(depts => Object.values(depts).flat()).map(row => [
         row.employee,
         `Rs. ${row.grossSalary.toLocaleString()}`,
         `Rs. ${row.employeeContrib.toLocaleString()}`,
@@ -246,7 +275,7 @@ export default function PfEsiPtPage() {
     autoTable(doc, {
       startY: 73,
       head: [['Employee', 'Gross Salary', 'PT Amount', 'State']],
-      body: ptData.map(row => [
+      body: Object.values(ptHierarchical).flatMap(depts => Object.values(depts).flat()).map(row => [
         row.employee,
         `Rs. ${row.grossSalary.toLocaleString()}`,
         `Rs. ${row.ptAmount.toLocaleString()}`,
@@ -371,113 +400,139 @@ export default function PfEsiPtPage() {
                 <TabsTrigger value="pt" data-testid="tab-pt">Professional Tax</TabsTrigger>
               </TabsList>
               <TabsContent value="pf" className="mt-4">
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="border-b">
-                        <th className="text-left py-3 px-4 font-medium text-slate-600">Employee</th>
-                        <th className="text-left py-3 px-4 font-medium text-slate-600">Basic Salary</th>
-                        <th className="text-left py-3 px-4 font-medium text-slate-600">Employee (12%)</th>
-                        <th className="text-left py-3 px-4 font-medium text-slate-600">Employer (12%)</th>
-                        <th className="text-left py-3 px-4 font-medium text-slate-600">EDLI (0.5%)</th>
-                        <th className="text-left py-3 px-4 font-medium text-slate-600">Admin Charges (0.5%)</th>
-                        <th className="text-left py-3 px-4 font-medium text-slate-600">Total</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {pfData.map((row, index) => (
-                        <tr key={index} className="border-b hover:bg-slate-50" data-testid={`row-pf-${index}`}>
-                          <td className="py-3 px-4 font-medium">{row.employee}</td>
-                          <td className="py-3 px-4">₹{row.basicSalary.toLocaleString()}</td>
-                          <td className="py-3 px-4">₹{row.employeeContrib.toLocaleString()}</td>
-                          <td className="py-3 px-4">₹{row.employerContrib.toLocaleString()}</td>
-                          <td className="py-3 px-4">₹{row.edliContrib.toLocaleString()}</td>
-                          <td className="py-3 px-4">₹{row.adminCharges.toLocaleString()}</td>
-                          <td className="py-3 px-4 font-medium text-teal-600">₹{row.total.toLocaleString()}</td>
-                        </tr>
+                <div className="space-y-8">
+                  {Object.entries(pfHierarchical).map(([unitName, departments]) => (
+                    <div key={unitName} className="space-y-4">
+                      <h2 className="text-xl font-bold text-teal-700 border-b-2 border-teal-100 pb-2 flex items-center gap-2">
+                        <Building2 className="h-5 w-5" />
+                        Unit: {unitName}
+                      </h2>
+                      {Object.entries(departments).map(([deptName, staff]) => (
+                        <div key={deptName} className="pl-4 space-y-2">
+                          <h3 className="text-lg font-semibold text-slate-700 flex items-center gap-2">
+                            <Users className="h-4 w-4" />
+                            Department: {deptName}
+                          </h3>
+                          <div className="overflow-x-auto rounded-lg border border-slate-200">
+                            <table className="w-full">
+                              <thead>
+                                <tr className="bg-slate-50 border-b">
+                                  <th className="text-left py-3 px-4 font-medium text-slate-600">Employee</th>
+                                  <th className="text-left py-3 px-4 font-medium text-slate-600">Basic Salary</th>
+                                  <th className="text-left py-3 px-4 font-medium text-slate-600">Employee (12%)</th>
+                                  <th className="text-left py-3 px-4 font-medium text-slate-600">Employer (12%)</th>
+                                  <th className="text-left py-3 px-4 font-medium text-slate-600">EDLI (0.5%)</th>
+                                  <th className="text-left py-3 px-4 font-medium text-slate-600">Admin Charges (0.5%)</th>
+                                  <th className="text-left py-3 px-4 font-medium text-slate-600">Total</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {staff.map((row, index) => (
+                                  <tr key={index} className="border-b hover:bg-slate-50 transition-colors">
+                                    <td className="py-3 px-4 font-medium">{row.employee}</td>
+                                    <td className="py-3 px-4">₹{row.basicSalary.toLocaleString()}</td>
+                                    <td className="py-3 px-4">₹{row.employeeContrib.toLocaleString()}</td>
+                                    <td className="py-3 px-4">₹{row.employerContrib.toLocaleString()}</td>
+                                    <td className="py-3 px-4">₹{row.edliContrib.toLocaleString()}</td>
+                                    <td className="py-3 px-4">₹{row.adminCharges.toLocaleString()}</td>
+                                    <td className="py-3 px-4 font-medium text-teal-600">₹{row.total.toLocaleString()}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
                       ))}
-                    </tbody>
-                  </table>
+                    </div>
+                  ))}
                 </div>
               </TabsContent>
               <TabsContent value="esi" className="mt-4">
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="border-b">
-                        <th className="text-left py-3 px-4 font-medium text-slate-600">Employee</th>
-                        <th className="text-left py-3 px-4 font-medium text-slate-600">Gross Salary (Monthly)</th>
-                        <th className="text-left py-3 px-4 font-medium text-slate-600">Employee (0.75%)</th>
-                        <th className="text-left py-3 px-4 font-medium text-slate-600">Employer (3.25%)</th>
-                        <th className="text-left py-3 px-4 font-medium text-slate-600">Total ESI</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {esiData.map((row, index) => (
-                        <tr key={index} className="border-b hover:bg-slate-50" data-testid={`row-esi-${index}`}>
-                          <td className="py-3 px-4 font-medium">{row.employee}</td>
-                          <td className="py-3 px-4">₹{row.grossSalary.toLocaleString()}</td>
-                          <td className="py-3 px-4">₹{row.employeeContrib.toLocaleString()}</td>
-                          <td className="py-3 px-4">₹{row.employerContrib.toLocaleString()}</td>
-                          <td className="py-3 px-4 font-medium text-teal-600">₹{row.total.toLocaleString()}</td>
-                        </tr>
+                <div className="space-y-8">
+                  {Object.entries(esiHierarchical).map(([unitName, departments]) => (
+                    <div key={unitName} className="space-y-4">
+                      <h2 className="text-xl font-bold text-teal-700 border-b-2 border-teal-100 pb-2 flex items-center gap-2">
+                        <Building2 className="h-5 w-5" />
+                        Unit: {unitName}
+                      </h2>
+                      {Object.entries(departments).map(([deptName, staff]) => (
+                        <div key={deptName} className="pl-4 space-y-2">
+                          <h3 className="text-lg font-semibold text-slate-700 flex items-center gap-2">
+                            <Users className="h-4 w-4" />
+                            Department: {deptName}
+                          </h3>
+                          <div className="overflow-x-auto rounded-lg border border-slate-200">
+                            <table className="w-full">
+                              <thead>
+                                <tr className="bg-slate-50 border-b">
+                                  <th className="text-left py-3 px-4 font-medium text-slate-600">Employee</th>
+                                  <th className="text-left py-3 px-4 font-medium text-slate-600">Gross Salary (Monthly)</th>
+                                  <th className="text-left py-3 px-4 font-medium text-slate-600">Employee (0.75%)</th>
+                                  <th className="text-left py-3 px-4 font-medium text-slate-600">Employer (3.25%)</th>
+                                  <th className="text-left py-3 px-4 font-medium text-slate-600">Total ESI</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {staff.map((row, index) => (
+                                  <tr key={index} className="border-b hover:bg-slate-50 transition-colors">
+                                    <td className="py-3 px-4 font-medium">{row.employee}</td>
+                                    <td className="py-3 px-4">₹{row.grossSalary.toLocaleString()}</td>
+                                    <td className="py-3 px-4">₹{row.employeeContrib.toLocaleString()}</td>
+                                    <td className="py-3 px-4">₹{row.employerContrib.toLocaleString()}</td>
+                                    <td className="py-3 px-4 font-medium text-teal-600">₹{row.total.toLocaleString()}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
                       ))}
-                    </tbody>
-                    <tfoot className="bg-slate-50">
-                      <tr>
-                        <td colSpan={4} className="py-3 px-4 font-semibold text-slate-700">Total ESI Contribution</td>
-                        <td className="py-3 px-4 font-bold text-teal-700">
-                          ₹{esiData.reduce((sum, row) => sum + row.total, 0).toLocaleString()}
-                        </td>
-                      </tr>
-                    </tfoot>
-                  </table>
-                </div>
-                <div className="mt-4 p-4 bg-blue-50 rounded-lg">
-                  <p className="text-sm text-blue-700">
-                    <strong>Note:</strong> ESI is applicable for employees with gross salary up to ₹21,000/month. 
-                    Employee contribution is 0.75% and employer contribution is 3.25%.
-                  </p>
+                    </div>
+                  ))}
                 </div>
               </TabsContent>
               <TabsContent value="pt" className="mt-4">
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="border-b">
-                        <th className="text-left py-3 px-4 font-medium text-slate-600">Employee</th>
-                        <th className="text-left py-3 px-4 font-medium text-slate-600">Gross Salary</th>
-                        <th className="text-left py-3 px-4 font-medium text-slate-600">State</th>
-                        <th className="text-left py-3 px-4 font-medium text-slate-600">PT Amount (Monthly)</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {ptData.map((row, index) => (
-                        <tr key={index} className="border-b hover:bg-slate-50" data-testid={`row-pt-${index}`}>
-                          <td className="py-3 px-4 font-medium">{row.employee}</td>
-                          <td className="py-3 px-4">₹{row.grossSalary.toLocaleString()}</td>
-                          <td className="py-3 px-4">
-                            <Badge variant="outline">{row.state}</Badge>
-                          </td>
-                          <td className="py-3 px-4 font-medium text-teal-600">₹{row.ptAmount.toLocaleString()}</td>
-                        </tr>
+                <div className="space-y-8">
+                  {Object.entries(ptHierarchical).map(([unitName, departments]) => (
+                    <div key={unitName} className="space-y-4">
+                      <h2 className="text-xl font-bold text-teal-700 border-b-2 border-teal-100 pb-2 flex items-center gap-2">
+                        <Building2 className="h-5 w-5" />
+                        Unit: {unitName}
+                      </h2>
+                      {Object.entries(departments).map(([deptName, staff]) => (
+                        <div key={deptName} className="pl-4 space-y-2">
+                          <h3 className="text-lg font-semibold text-slate-700 flex items-center gap-2">
+                            <Users className="h-4 w-4" />
+                            Department: {deptName}
+                          </h3>
+                          <div className="overflow-x-auto rounded-lg border border-slate-200">
+                            <table className="w-full">
+                              <thead>
+                                <tr className="bg-slate-50 border-b">
+                                  <th className="text-left py-3 px-4 font-medium text-slate-600">Employee</th>
+                                  <th className="text-left py-3 px-4 font-medium text-slate-600">Gross Salary</th>
+                                  <th className="text-left py-3 px-4 font-medium text-slate-600">State</th>
+                                  <th className="text-left py-3 px-4 font-medium text-slate-600">PT Amount (Monthly)</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {staff.map((row, index) => (
+                                  <tr key={index} className="border-b hover:bg-slate-50 transition-colors">
+                                    <td className="py-3 px-4 font-medium">{row.employee}</td>
+                                    <td className="py-3 px-4">₹{row.grossSalary.toLocaleString()}</td>
+                                    <td className="py-3 px-4">
+                                      <Badge variant="outline">{row.state}</Badge>
+                                    </td>
+                                    <td className="py-3 px-4 font-medium text-teal-600">₹{row.ptAmount.toLocaleString()}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
                       ))}
-                    </tbody>
-                    <tfoot className="bg-slate-50">
-                      <tr>
-                        <td colSpan={3} className="py-3 px-4 font-semibold text-slate-700">Total PT Collection (Monthly)</td>
-                        <td className="py-3 px-4 font-bold text-teal-700">
-                          ₹{ptData.reduce((sum, row) => sum + row.ptAmount, 0).toLocaleString()}
-                        </td>
-                      </tr>
-                    </tfoot>
-                  </table>
-                </div>
-                <div className="mt-4 p-4 bg-amber-50 rounded-lg">
-                  <p className="text-sm text-amber-700">
-                    <strong>Note:</strong> Professional Tax rates vary by state. Maharashtra: ₹200/month (max), 
-                    Karnataka: ₹175/month (max), Gujarat: ₹150/month (max). Employers must deposit PT by the end of each month.
-                  </p>
+                    </div>
+                  ))}
                 </div>
               </TabsContent>
             </Tabs>
