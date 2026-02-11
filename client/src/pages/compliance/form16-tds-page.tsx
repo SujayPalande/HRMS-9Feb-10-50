@@ -17,9 +17,11 @@ import { FileText, Download, Search, Calendar, IndianRupee, CheckCircle, Clock, 
 import { motion } from "framer-motion";
 import { useState, useMemo } from "react";
 import { useToast } from "@/hooks/use-toast";
+import { useQuery } from "@tanstack/react-query";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { addCompanyHeader, addWatermark, addHRSignature, addFooter, addDocumentDate, generateReferenceNumber, addReferenceNumber, COMPANY_NAME, COMPANY_ADDRESS, HR_NAME, HR_DESIGNATION } from "@/lib/pdf-utils";
+import { User, Department, Unit } from "@shared/schema";
 
 export default function Form16TdsPage() {
   const [selectedYear, setSelectedYear] = useState("2023-24");
@@ -29,6 +31,32 @@ export default function Form16TdsPage() {
   const [showBasicForm16Dialog, setShowBasicForm16Dialog] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
+
+  const { data: employees = [] } = useQuery<User[]>({ queryKey: ["/api/employees"] });
+  const { data: departments = [] } = useQuery<Department[]>({ queryKey: ["/api/departments"] });
+  const { data: units = [] } = useQuery<Unit[]>({ queryKey: ["/api/masters/units"] });
+
+  const employeeTds = useMemo(() => {
+    return employees
+      .filter(emp => emp.isActive)
+      .map(emp => {
+        const totalIncome = (emp.salary || 0) * 12;
+        const tdsDeducted = Math.round(totalIncome * 0.1); // Placeholder logic
+        const dept = departments.find(d => d.id === emp.departmentId);
+        const unit = units.find(u => u.id === dept?.unitId);
+
+        return {
+          id: emp.id,
+          employee: `${emp.firstName} ${emp.lastName}`,
+          pan: "ABCDE1234F", // Need actual PAN field in schema, using placeholder
+          totalIncome,
+          tdsDeducted,
+          form16: "Pending",
+          departmentName: dept?.name || "Unassigned",
+          unitName: unit?.name || "Unassigned"
+        };
+      });
+  }, [employees, departments, units]);
 
   const [basicForm16Data, setBasicForm16Data] = useState({
     employeeName: "",
@@ -75,28 +103,22 @@ export default function Form16TdsPage() {
     { title: "Filed with Dept", value: "128", status: "success", icon: <CheckCircle className="h-5 w-5" /> },
   ];
 
-  const [employeeTds, setEmployeeTds] = useState([
-    { id: 1, employee: "John Doe", pan: "ABCDE1234F", totalIncome: 1200000, tdsDeducted: 120000, form16: "Generated" },
-    { id: 2, employee: "Jane Smith", pan: "FGHIJ5678K", totalIncome: 980000, tdsDeducted: 85000, form16: "Generated" },
-    { id: 3, employee: "Mike Johnson", pan: "LMNOP9012Q", totalIncome: 1500000, tdsDeducted: 180000, form16: "Pending" },
-    { id: 4, employee: "Sarah Wilson", pan: "RSTUV3456W", totalIncome: 850000, tdsDeducted: 65000, form16: "Generated" },
-    { id: 5, employee: "Rahul Sharma", pan: "WXYZ7890A", totalIncome: 720000, tdsDeducted: 52000, form16: "Pending" },
-    { id: 6, employee: "Priya Patel", pan: "BCDGH4567E", totalIncome: 1100000, tdsDeducted: 98000, form16: "Generated" },
-    { id: 7, employee: "Amit Kumar", pan: "EFGIJ1234K", totalIncome: 680000, tdsDeducted: 45000, form16: "Pending" },
-    { id: 8, employee: "Neha Gupta", pan: "HIJKL8901M", totalIncome: 1350000, tdsDeducted: 145000, form16: "Generated" },
-    { id: 9, employee: "Raj Verma", pan: "KLMNO5678P", totalIncome: 920000, tdsDeducted: 78000, form16: "Pending" },
-    { id: 10, employee: "Pooja Singh", pan: "NOPQR2345S", totalIncome: 1050000, tdsDeducted: 92000, form16: "Generated" },
-  ]);
+  const [statusMap, setStatusMap] = useState<Record<number, string>>({});
 
   const filteredEmployees = useMemo(() => {
-    if (!searchQuery.trim()) return employeeTds;
+    const data = employeeTds.map(emp => ({
+      ...emp,
+      form16: statusMap[emp.id] || "Pending"
+    }));
+
+    if (!searchQuery.trim()) return data;
     const query = searchQuery.toLowerCase();
-    return employeeTds.filter(
+    return data.filter(
       emp => 
         emp.employee.toLowerCase().includes(query) || 
         emp.pan.toLowerCase().includes(query)
     );
-  }, [employeeTds, searchQuery]);
+  }, [employeeTds, searchQuery, statusMap]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -305,12 +327,10 @@ export default function Form16TdsPage() {
     setGeneratingIndex(index);
     await new Promise(resolve => setTimeout(resolve, 1000));
     
-    const employee = employeeTds.find((_, i) => i === index);
+    const employee = filteredEmployees[index];
     if (employee) {
       generateForm16PDF(employee);
-      setEmployeeTds(prev => prev.map((emp, i) => 
-        i === index ? { ...emp, form16: "Generated" } : emp
-      ));
+      setStatusMap(prev => ({ ...prev, [employee.id]: "Generated" }));
       toast({
         title: "Form 16 Generated",
         description: `Form 16 for ${employee.employee} has been generated and downloaded.`,
@@ -320,7 +340,7 @@ export default function Form16TdsPage() {
     setGeneratingIndex(null);
   };
 
-  const handleDownloadForm16 = (employee: typeof employeeTds[0]) => {
+  const handleDownloadForm16 = (employee: typeof filteredEmployees[0]) => {
     generateForm16PDF(employee);
     toast({
       title: "Form 16 Downloaded",
@@ -329,7 +349,7 @@ export default function Form16TdsPage() {
   };
 
   const handleGenerateAllForm16 = async () => {
-    const pendingEmployees = employeeTds.filter(emp => emp.form16 === "Pending");
+    const pendingEmployees = filteredEmployees.filter(emp => emp.form16 === "Pending");
     
     if (pendingEmployees.length === 0) {
       toast({
@@ -341,12 +361,14 @@ export default function Form16TdsPage() {
 
     setGeneratingAll(true);
     
+    const newStatusMap = { ...statusMap };
     for (const employee of pendingEmployees) {
       await new Promise(resolve => setTimeout(resolve, 500));
       generateForm16PDF(employee);
+      newStatusMap[employee.id] = "Generated";
     }
     
-    setEmployeeTds(prev => prev.map(emp => ({ ...emp, form16: "Generated" })));
+    setStatusMap(newStatusMap);
     
     toast({
       title: "All Form 16 Generated",

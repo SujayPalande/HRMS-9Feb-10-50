@@ -1,10 +1,10 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Printer, FileSpreadsheet, Download, FileText, Upload } from "lucide-react";
+import { Printer, FileSpreadsheet, Download, FileText, Upload, Building2, Users } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { AppLayout } from "@/components/layout/app-layout";
@@ -12,6 +12,8 @@ import { useToast } from "@/hooks/use-toast";
 import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { Department, Unit } from "@shared/schema";
 
 interface Employee {
   id: number;
@@ -56,11 +58,33 @@ export default function LeaveRegisterPage() {
   const currentDate = new Date();
   const [selectedYear, setSelectedYear] = useState(currentDate.getFullYear());
   const [factoryName, setFactoryName] = useState("ASN HR Consultancy & Services");
-  const [departmentName, setDepartmentName] = useState("All Departments");
 
   const { data: employees = [] } = useQuery<Employee[]>({
     queryKey: ["/api/employees"],
   });
+
+  const { data: departments = [] } = useQuery<Department[]>({ queryKey: ["/api/departments"] });
+  const { data: units = [] } = useQuery<Unit[]>({ queryKey: ["/api/masters/units"] });
+
+  const hierarchicalData = useMemo(() => {
+    const data = employees.map(emp => {
+      const dept = departments.find(d => d.id === emp.departmentId);
+      const unit = units.find(u => u.id === dept?.unitId);
+      return {
+        ...emp,
+        departmentName: dept?.name || "Unassigned",
+        unitName: unit?.name || "Unassigned"
+      };
+    });
+
+    const hierarchical: Record<string, Record<string, typeof data>> = {};
+    data.forEach(item => {
+      if (!hierarchical[item.unitName]) hierarchical[item.unitName] = {};
+      if (!hierarchical[item.unitName][item.departmentName]) hierarchical[item.unitName][item.departmentName] = [];
+      hierarchical[item.unitName][item.departmentName].push(item);
+    });
+    return hierarchical;
+  }, [employees, departments, units]);
 
   const { data: leaveRequests = [] } = useQuery<Leave[]>({
     queryKey: ["/api/leave-requests"],
@@ -96,7 +120,7 @@ export default function LeaveRegisterPage() {
       return a.userId === employee.id && date >= yearStart && date <= yearEnd;
     });
 
-    const daysWorked = yearAttendance.filter(a => a.status === "present").length;
+    const daysWorked = yearAttendance.filter(a => a.status === "present" || a.status === "P").length;
     const layOffDays = yearAttendance.filter(a => a.status === "layoff").length;
     
     const employeeLeaves = leaveRequests.filter(l => {
@@ -161,11 +185,10 @@ export default function LeaveRegisterPage() {
     
     doc.setFontSize(10);
     doc.text(`Factory: ${factoryName}`, 14, 42);
-    doc.text(`Department: ${departmentName}`, 14, 48);
     doc.text(`Part I - Adults`, doc.internal.pageSize.width - 60, 42);
     doc.text(`Financial Year: ${selectedYear}-${selectedYear + 1}`, doc.internal.pageSize.width - 60, 48);
 
-    const tableData = employees.map((emp, index) => {
+    const tableData = Object.values(hierarchicalData).flatMap(depts => Object.values(depts).flat()).map((emp, index) => {
       const data = calculateLeaveData(emp);
       return [
         index + 1,
@@ -219,7 +242,6 @@ export default function LeaveRegisterPage() {
       ["Register of leave with wages"],
       [""],
       [`Factory: ${factoryName}`],
-      [`Department: ${departmentName}`],
       [`Financial Year: ${selectedYear}-${selectedYear + 1}`],
       ["Part I - Adults"],
       [""]
@@ -237,7 +259,7 @@ export default function LeaveRegisterPage() {
       "Date of discharge", "Date of amount of payment made in lieu of leave with wages due", "Remarks"
     ];
 
-    const dataRows = employees.map((emp, index) => {
+    const dataRows = Object.values(hierarchicalData).flatMap(depts => Object.values(depts).flat()).map((emp, index) => {
       const data = calculateLeaveData(emp);
       const joinDate = emp.joinDate ? new Date(emp.joinDate) : null;
       const yearsOfService = joinDate ? selectedYear - joinDate.getFullYear() : 0;
@@ -414,21 +436,13 @@ export default function LeaveRegisterPage() {
             <CardTitle>Report Settings</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Factory Name</Label>
                 <Input 
                   value={factoryName} 
                   onChange={(e) => setFactoryName(e.target.value)}
                   data-testid="input-factory-name"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Department</Label>
-                <Input 
-                  value={departmentName} 
-                  onChange={(e) => setDepartmentName(e.target.value)}
-                  data-testid="input-department-name"
                 />
               </div>
               <div className="space-y-2">
@@ -459,7 +473,6 @@ export default function LeaveRegisterPage() {
             <div className="grid grid-cols-2 gap-4 mt-4 text-sm">
               <div>
                 <p><strong>Factory:</strong> {factoryName}</p>
-                <p><strong>Department:</strong> {departmentName}</p>
               </div>
               <div className="text-right">
                 <p><strong>Part I - Adults</strong></p>
@@ -468,66 +481,86 @@ export default function LeaveRegisterPage() {
             </div>
           </CardHeader>
           <CardContent className="overflow-x-auto">
-            <Table className="text-xs">
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="text-center w-10" rowSpan={2}>Sr. No.</TableHead>
-                  <TableHead className="text-center w-16" rowSpan={2}>Emp ID</TableHead>
-                  <TableHead className="min-w-[150px]" rowSpan={2}>Name</TableHead>
-                  <TableHead className="text-center w-20" rowSpan={2}>DOJ</TableHead>
-                  <TableHead className="text-center" colSpan={5}>Number of days during calendar year</TableHead>
-                  <TableHead className="text-center" colSpan={3}>Leave with wages to credit</TableHead>
-                  <TableHead className="text-center w-16" rowSpan={2}>Daily Rate</TableHead>
-                  <TableHead className="text-center w-16" rowSpan={2}>Leave Wages</TableHead>
-                  <TableHead className="text-center w-20" rowSpan={2}>Remarks</TableHead>
-                </TableRow>
-                <TableRow>
-                  <TableHead className="text-center w-14">Days Worked</TableHead>
-                  <TableHead className="text-center w-12">Lay-off</TableHead>
-                  <TableHead className="text-center w-14">Maternity</TableHead>
-                  <TableHead className="text-center w-12">Leave Enjoyed</TableHead>
-                  <TableHead className="text-center w-12">Total</TableHead>
-                  <TableHead className="text-center w-14">Previous Balance</TableHead>
-                  <TableHead className="text-center w-12">Earned</TableHead>
-                  <TableHead className="text-center w-12">Balance</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {employees.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={15} className="text-center py-8 text-muted-foreground">
-                      No employees found. Add employees to generate leave register.
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  employees.map((emp, index) => {
-                    const data = calculateLeaveData(emp);
+            <div className="space-y-8">
+              {Object.entries(hierarchicalData).length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  No employees found. Add employees to generate leave register.
+                </div>
+              ) : (
+                Object.entries(hierarchicalData).map(([unitName, departments]) => (
+                  <div key={unitName} className="space-y-4">
+                    <h2 className="text-xl font-bold text-teal-700 border-b-2 border-teal-100 pb-2 flex items-center gap-2">
+                      <Building2 className="h-5 w-5" />
+                      Unit: {unitName}
+                    </h2>
+                    
+                    {Object.entries(departments).map(([deptName, staff]) => (
+                      <div key={deptName} className="pl-4 space-y-2">
+                        <h3 className="text-lg font-semibold text-slate-700 flex items-center gap-2">
+                          <Users className="h-4 w-4" />
+                          Department: {deptName}
+                        </h3>
+                        
+                        <div className="overflow-x-auto rounded-lg border border-slate-200">
+                          <Table className="text-xs">
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead className="text-center w-10" rowSpan={2}>Sr. No.</TableHead>
+                                <TableHead className="text-center w-16" rowSpan={2}>Emp ID</TableHead>
+                                <TableHead className="min-w-[150px]" rowSpan={2}>Name</TableHead>
+                                <TableHead className="text-center w-20" rowSpan={2}>DOJ</TableHead>
+                                <TableHead className="text-center" colSpan={5}>Number of days during calendar year</TableHead>
+                                <TableHead className="text-center" colSpan={3}>Leave with wages to credit</TableHead>
+                                <TableHead className="text-center w-16" rowSpan={2}>Daily Rate</TableHead>
+                                <TableHead className="text-center w-16" rowSpan={2}>Leave Wages</TableHead>
+                                <TableHead className="text-center w-20" rowSpan={2}>Remarks</TableHead>
+                              </TableRow>
+                              <TableRow>
+                                <TableHead className="text-center w-14">Days Worked</TableHead>
+                                <TableHead className="text-center w-12">Lay-off</TableHead>
+                                <TableHead className="text-center w-14">Maternity</TableHead>
+                                <TableHead className="text-center w-12">Leave Enjoyed</TableHead>
+                                <TableHead className="text-center w-12">Total</TableHead>
+                                <TableHead className="text-center w-14">Previous Balance</TableHead>
+                                <TableHead className="text-center w-12">Earned</TableHead>
+                                <TableHead className="text-center w-12">Balance</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {staff.map((emp, index) => {
+                                const data = calculateLeaveData(emp);
 
-                    return (
-                      <TableRow key={emp.id} data-testid={`row-employee-${emp.id}`}>
-                        <TableCell className="text-center">{index + 1}</TableCell>
-                        <TableCell className="text-center">{emp.employeeId}</TableCell>
-                        <TableCell className="font-medium">{emp.firstName} {emp.lastName}</TableCell>
-                        <TableCell className="text-center">
-                          {emp.joinDate ? new Date(emp.joinDate).toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: '2-digit' }) : "-"}
-                        </TableCell>
-                        <TableCell className="text-center">{data.daysWorked}</TableCell>
-                        <TableCell className="text-center">{data.layOffDays}</TableCell>
-                        <TableCell className="text-center">{data.maternityLeave}</TableCell>
-                        <TableCell className="text-center">{data.leaveEnjoyed}</TableCell>
-                        <TableCell className="text-center font-medium">{data.totalDays}</TableCell>
-                        <TableCell className="text-center">{data.previousBalance}</TableCell>
-                        <TableCell className="text-center">{data.earnedLeave}</TableCell>
-                        <TableCell className="text-center font-medium">{data.balanceLeave}</TableCell>
-                        <TableCell className="text-center">{data.dailyRate}</TableCell>
-                        <TableCell className="text-center">{data.leaveWages > 0 ? data.leaveWages : "-"}</TableCell>
-                        <TableCell className="text-center">-</TableCell>
-                      </TableRow>
-                    );
-                  })
-                )}
-              </TableBody>
-            </Table>
+                                return (
+                                  <TableRow key={emp.id} data-testid={`row-employee-${emp.id}`}>
+                                    <TableCell className="text-center">{index + 1}</TableCell>
+                                    <TableCell className="text-center">{emp.employeeId}</TableCell>
+                                    <TableCell className="font-medium">{emp.firstName} {emp.lastName}</TableCell>
+                                    <TableCell className="text-center">
+                                      {emp.joinDate ? new Date(emp.joinDate).toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: '2-digit' }) : "-"}
+                                    </TableCell>
+                                    <TableCell className="text-center">{data.daysWorked}</TableCell>
+                                    <TableCell className="text-center">{data.layOffDays}</TableCell>
+                                    <TableCell className="text-center">{data.maternityLeave}</TableCell>
+                                    <TableCell className="text-center">{data.leaveEnjoyed}</TableCell>
+                                    <TableCell className="text-center font-medium">{data.totalDays}</TableCell>
+                                    <TableCell className="text-center">{data.previousBalance}</TableCell>
+                                    <TableCell className="text-center">{data.earnedLeave}</TableCell>
+                                    <TableCell className="text-center font-medium">{data.balanceLeave}</TableCell>
+                                    <TableCell className="text-center">{data.dailyRate}</TableCell>
+                                    <TableCell className="text-center">{data.leaveWages > 0 ? data.leaveWages : "-"}</TableCell>
+                                    <TableCell className="text-center">-</TableCell>
+                                  </TableRow>
+                                );
+                              })}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ))
+              )}
+            </div>
           </CardContent>
         </Card>
 

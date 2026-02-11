@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Download, Upload, Building2 } from "lucide-react";
+import { Download, Upload, Building2, Users } from "lucide-react";
 import { motion } from "framer-motion";
 import { useState, useMemo } from "react";
 import { useToast } from "@/hooks/use-toast";
@@ -12,7 +12,7 @@ import { useQuery } from "@tanstack/react-query";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { addCompanyHeader, addWatermark, addHRSignature, addFooter, addDocumentDate, generateReferenceNumber, addReferenceNumber } from "@/lib/pdf-utils";
-import { User } from "@shared/schema";
+import { User, Department, Unit } from "@shared/schema";
 
 export default function EsiPage() {
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
@@ -21,9 +21,11 @@ export default function EsiPage() {
   const { toast } = useToast();
   
   const { data: employees = [] } = useQuery<User[]>({ queryKey: ["/api/employees"] });
+  const { data: departments = [] } = useQuery<Department[]>({ queryKey: ["/api/departments"] });
+  const { data: units = [] } = useQuery<Unit[]>({ queryKey: ["/api/masters/units"] });
   
   const esiData = useMemo(() => {
-    return employees
+    const data = employees
       .filter(emp => emp.isActive && emp.salary && emp.salary > 0)
       .map(emp => {
         const monthlyCTC = emp.salary!;
@@ -31,15 +33,29 @@ export default function EsiPage() {
         
         const employeeContrib = Math.round(grossSalary * 0.0075);
         const employerContrib = Math.round(grossSalary * 0.0325);
+
+        const dept = departments.find(d => d.id === emp.departmentId);
+        const unit = units.find(u => u.id === dept?.unitId);
+
         return {
           employee: `${emp.firstName} ${emp.lastName}`,
           grossSalary,
           employeeContrib,
           employerContrib,
-          total: employeeContrib + employerContrib
+          total: employeeContrib + employerContrib,
+          departmentName: dept?.name || "Unassigned",
+          unitName: unit?.name || "Unassigned"
         };
       });
-  }, [employees]);
+
+    const hierarchical: Record<string, Record<string, typeof data>> = {};
+    data.forEach(item => {
+      if (!hierarchical[item.unitName]) hierarchical[item.unitName] = {};
+      if (!hierarchical[item.unitName][item.departmentName]) hierarchical[item.unitName][item.departmentName] = [];
+      hierarchical[item.unitName][item.departmentName].push(item);
+    });
+    return hierarchical;
+  }, [employees, departments, units]);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -68,7 +84,7 @@ export default function EsiPage() {
     autoTable(doc, {
       startY: 80,
       head: [['Employee', 'Gross Salary', 'Employee (0.75%)', 'Employer (3.25%)', 'Total']],
-      body: esiData.map(row => [
+      body: Object.values(esiData).flatMap(depts => Object.values(depts).flat()).map(row => [
         row.employee,
         `Rs. ${row.grossSalary.toLocaleString()}`,
         `Rs. ${row.employeeContrib.toLocaleString()}`,
@@ -119,32 +135,52 @@ export default function EsiPage() {
         <Card>
           <CardHeader>
             <CardTitle>ESI Contributions</CardTitle>
-            <CardDescription>Monthly statutory ESI details</CardDescription>
+            <CardDescription>Monthly statutory ESI details by Unit and Department</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b">
-                    <th className="text-left py-3 px-4 text-slate-600">Employee</th>
-                    <th className="text-left py-3 px-4 text-slate-600">Gross Salary</th>
-                    <th className="text-left py-3 px-4 text-slate-600">Employee (0.75%)</th>
-                    <th className="text-left py-3 px-4 text-slate-600">Employer (3.25%)</th>
-                    <th className="text-left py-3 px-4 text-slate-600">Total</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {esiData.map((row, index) => (
-                    <tr key={index} className="border-b hover:bg-slate-50">
-                      <td className="py-3 px-4 font-medium">{row.employee}</td>
-                      <td className="py-3 px-4">₹{row.grossSalary.toLocaleString()}</td>
-                      <td className="py-3 px-4">₹{row.employeeContrib.toLocaleString()}</td>
-                      <td className="py-3 px-4">₹{row.employerContrib.toLocaleString()}</td>
-                      <td className="py-3 px-4 font-medium text-teal-600">₹{row.total.toLocaleString()}</td>
-                    </tr>
+            <div className="space-y-8">
+              {Object.entries(esiData).map(([unitName, departments]) => (
+                <div key={unitName} className="space-y-4">
+                  <h2 className="text-xl font-bold text-teal-700 border-b-2 border-teal-100 pb-2 flex items-center gap-2">
+                    <Building2 className="h-5 w-5" />
+                    Unit: {unitName}
+                  </h2>
+                  
+                  {Object.entries(departments).map(([deptName, staff]) => (
+                    <div key={deptName} className="pl-4 space-y-2">
+                      <h3 className="text-lg font-semibold text-slate-700 flex items-center gap-2">
+                        <Users className="h-4 w-4" />
+                        Department: {deptName}
+                      </h3>
+                      
+                      <div className="overflow-x-auto rounded-lg border border-slate-200">
+                        <table className="w-full">
+                          <thead>
+                            <tr className="bg-slate-50 border-b">
+                              <th className="text-left py-3 px-4 text-slate-600 font-semibold">Employee</th>
+                              <th className="text-left py-3 px-4 text-slate-600 font-semibold">Gross Salary</th>
+                              <th className="text-left py-3 px-4 text-slate-600 font-semibold">Employee (0.75%)</th>
+                              <th className="text-left py-3 px-4 text-slate-600 font-semibold">Employer (3.25%)</th>
+                              <th className="text-left py-3 px-4 text-slate-600 font-semibold">Total</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {staff.map((row, index) => (
+                              <tr key={index} className="border-b hover:bg-slate-50 transition-colors">
+                                <td className="py-3 px-4 font-medium text-slate-900">{row.employee}</td>
+                                <td className="py-3 px-4 text-slate-600">₹{row.grossSalary.toLocaleString()}</td>
+                                <td className="py-3 px-4 text-slate-600">₹{row.employeeContrib.toLocaleString()}</td>
+                                <td className="py-3 px-4 text-slate-600">₹{row.employerContrib.toLocaleString()}</td>
+                                <td className="py-3 px-4 font-bold text-teal-600">₹{row.total.toLocaleString()}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
                   ))}
-                </tbody>
-              </table>
+                </div>
+              ))}
             </div>
           </CardContent>
         </Card>

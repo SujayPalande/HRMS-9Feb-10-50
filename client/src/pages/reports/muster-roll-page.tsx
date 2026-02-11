@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Download, Printer, FileSpreadsheet, FileText, Upload } from "lucide-react";
+import { Download, Printer, FileSpreadsheet, FileText, Upload, Building2, Users } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { AppLayout } from "@/components/layout/app-layout";
@@ -14,6 +14,7 @@ import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { Department, Unit } from "@shared/schema";
 
 interface Employee {
   id: number;
@@ -66,6 +67,29 @@ export default function MusterRollPage() {
   const { data: employees = [] } = useQuery<Employee[]>({
     queryKey: ["/api/employees"],
   });
+
+  const { data: departments = [] } = useQuery<Department[]>({ queryKey: ["/api/departments"] });
+  const { data: units = [] } = useQuery<Unit[]>({ queryKey: ["/api/masters/units"] });
+
+  const hierarchicalData = useMemo(() => {
+    const data = employees.map(emp => {
+      const dept = departments.find(d => d.id === emp.departmentId);
+      const unit = units.find(u => u.id === dept?.unitId);
+      return {
+        ...emp,
+        departmentName: dept?.name || "Unassigned",
+        unitName: unit?.name || "Unassigned"
+      };
+    });
+
+    const hierarchical: Record<string, Record<string, typeof data>> = {};
+    data.forEach(item => {
+      if (!hierarchical[item.unitName]) hierarchical[item.unitName] = {};
+      if (!hierarchical[item.unitName][item.departmentName]) hierarchical[item.unitName][item.departmentName] = [];
+      hierarchical[item.unitName][item.departmentName].push(item);
+    });
+    return hierarchical;
+  }, [employees, departments, units]);
 
   const { data: attendanceRecords = [] } = useQuery<Attendance[]>({
     queryKey: ["/api/attendance"],
@@ -143,7 +167,7 @@ export default function MusterRollPage() {
     const hourlyRate = dailyRate / 8;
     const normalWages = Math.round(dailyRate * totalDaysWorked);
     const hraPayable = Math.round((hra / 26) * totalDaysWorked);
-    const overtimePayable = Math.round(overtimeHours * hourlyRate * 2);
+    const overtimePayable = Math.round(totalHoursWorked > 0 ? (overtimeHours * hourlyRate * 2) : 0);
     const allowances = payrollData?.allowances || 0;
     const grossWages = normalWages + hraPayable + overtimePayable + allowances;
     const pfDeduction = payrollData?.pfContribution || Math.round(basicSalary * 0.12);

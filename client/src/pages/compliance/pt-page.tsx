@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Download, Upload, Calculator } from "lucide-react";
+import { Download, Upload, Calculator, Building2, Users } from "lucide-react";
 import { motion } from "framer-motion";
 import { useState, useMemo } from "react";
 import { useToast } from "@/hooks/use-toast";
@@ -12,7 +12,7 @@ import { useQuery } from "@tanstack/react-query";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { addCompanyHeader, addWatermark, addHRSignature, addFooter, addDocumentDate, generateReferenceNumber, addReferenceNumber } from "@/lib/pdf-utils";
-import { User } from "@shared/schema";
+import { User, Department, Unit } from "@shared/schema";
 
 export default function PtPage() {
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
@@ -21,9 +21,11 @@ export default function PtPage() {
   const { toast } = useToast();
   
   const { data: employees = [] } = useQuery<User[]>({ queryKey: ["/api/employees"] });
+  const { data: departments = [] } = useQuery<Department[]>({ queryKey: ["/api/departments"] });
+  const { data: units = [] } = useQuery<Unit[]>({ queryKey: ["/api/masters/units"] });
   
   const ptData = useMemo(() => {
-    return employees
+    const data = employees
       .filter(emp => emp.isActive && emp.salary && emp.salary > 0)
       .map(emp => {
         const grossSalary = Math.round(emp.salary! / 12);
@@ -31,14 +33,28 @@ export default function PtPage() {
         if (grossSalary < 10000) ptAmount = 0;
         else if (grossSalary < 15000) ptAmount = 150;
         else if (grossSalary < 25000) ptAmount = 175;
+
+        const dept = departments.find(d => d.id === emp.departmentId);
+        const unit = units.find(u => u.id === dept?.unitId);
+
         return {
           employee: `${emp.firstName} ${emp.lastName}`,
           grossSalary,
           ptAmount,
-          state: "Maharashtra"
+          state: "Maharashtra",
+          departmentName: dept?.name || "Unassigned",
+          unitName: unit?.name || "Unassigned"
         };
       });
-  }, [employees]);
+
+    const hierarchical: Record<string, Record<string, typeof data>> = {};
+    data.forEach(item => {
+      if (!hierarchical[item.unitName]) hierarchical[item.unitName] = {};
+      if (!hierarchical[item.unitName][item.departmentName]) hierarchical[item.unitName][item.departmentName] = [];
+      hierarchical[item.unitName][item.departmentName].push(item);
+    });
+    return hierarchical;
+  }, [employees, departments, units]);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -67,7 +83,7 @@ export default function PtPage() {
     autoTable(doc, {
       startY: 80,
       head: [['Employee', 'Gross Salary', 'State', 'PT Amount']],
-      body: ptData.map(row => [
+      body: Object.values(ptData).flatMap(depts => Object.values(depts).flat()).map(row => [
         row.employee,
         `Rs. ${row.grossSalary.toLocaleString()}`,
         row.state,
@@ -117,30 +133,50 @@ export default function PtPage() {
         <Card>
           <CardHeader>
             <CardTitle>PT Collection</CardTitle>
-            <CardDescription>Monthly state-wise PT details</CardDescription>
+            <CardDescription>Monthly state-wise PT details by Unit and Department</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b">
-                    <th className="text-left py-3 px-4 text-slate-600">Employee</th>
-                    <th className="text-left py-3 px-4 text-slate-600">Gross Salary</th>
-                    <th className="text-left py-3 px-4 text-slate-600">State</th>
-                    <th className="text-left py-3 px-4 text-slate-600">PT Amount</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {ptData.map((row, index) => (
-                    <tr key={index} className="border-b hover:bg-slate-50">
-                      <td className="py-3 px-4 font-medium">{row.employee}</td>
-                      <td className="py-3 px-4">₹{row.grossSalary.toLocaleString()}</td>
-                      <td className="py-3 px-4">{row.state}</td>
-                      <td className="py-3 px-4 font-medium text-teal-600">₹{row.ptAmount.toLocaleString()}</td>
-                    </tr>
+            <div className="space-y-8">
+              {Object.entries(ptData).map(([unitName, departments]) => (
+                <div key={unitName} className="space-y-4">
+                  <h2 className="text-xl font-bold text-teal-700 border-b-2 border-teal-100 pb-2 flex items-center gap-2">
+                    <Building2 className="h-5 w-5" />
+                    Unit: {unitName}
+                  </h2>
+                  
+                  {Object.entries(departments).map(([deptName, staff]) => (
+                    <div key={deptName} className="pl-4 space-y-2">
+                      <h3 className="text-lg font-semibold text-slate-700 flex items-center gap-2">
+                        <Users className="h-4 w-4" />
+                        Department: {deptName}
+                      </h3>
+                      
+                      <div className="overflow-x-auto rounded-lg border border-slate-200">
+                        <table className="w-full">
+                          <thead>
+                            <tr className="bg-slate-50 border-b">
+                              <th className="text-left py-3 px-4 text-slate-600 font-semibold">Employee</th>
+                              <th className="text-left py-3 px-4 text-slate-600 font-semibold">Gross Salary</th>
+                              <th className="text-left py-3 px-4 text-slate-600 font-semibold">State</th>
+                              <th className="text-left py-3 px-4 text-slate-600 font-semibold">PT Amount</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {staff.map((row, index) => (
+                              <tr key={index} className="border-b hover:bg-slate-50 transition-colors">
+                                <td className="py-3 px-4 font-medium text-slate-900">{row.employee}</td>
+                                <td className="py-3 px-4 text-slate-600">₹{row.grossSalary.toLocaleString()}</td>
+                                <td className="py-3 px-4 text-slate-600">{row.state}</td>
+                                <td className="py-3 px-4 font-bold text-teal-600">₹{row.ptAmount.toLocaleString()}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
                   ))}
-                </tbody>
-              </table>
+                </div>
+              ))}
             </div>
           </CardContent>
         </Card>
