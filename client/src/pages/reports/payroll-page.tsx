@@ -251,12 +251,6 @@ export default function PayrollReportPage() {
   };
 
   const handleExportText = () => {
-    let textContent = `PAYROLL REPORT - ${selectedMonth}\n`;
-    textContent += `Unit: ${selectedUnit === 'all' ? 'All' : selectedUnit}\n`;
-    textContent += "=".repeat(80) + "\n";
-    textContent += `Emp ID\tName\tDepartment\tAmount Paid\n`;
-    textContent += "-".repeat(80) + "\n";
-
     const dataToExport = employees
       .filter(emp => {
         const dept = departments.find(d => d.id === emp.departmentId);

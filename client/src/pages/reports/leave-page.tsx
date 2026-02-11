@@ -244,12 +244,6 @@ export default function LeaveReportPage() {
   };
 
   const handleExportText = () => {
-    let textContent = `LEAVE REPORT - ${selectedMonth}\n`;
-    textContent += `Unit: ${selectedUnit === 'all' ? 'All' : selectedUnit}\n`;
-    textContent += "=".repeat(80) + "\n";
-    textContent += `Emp ID\tName\tDepartment\tApproved\tPending\tRemaining\n`;
-    textContent += "-".repeat(80) + "\n";
-
     const dataToExport = employees
       .filter(emp => {
         const dept = departments.find(d => d.id === emp.departmentId);

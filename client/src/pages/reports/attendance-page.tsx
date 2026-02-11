@@ -236,12 +236,6 @@ export default function AttendanceReportPage() {
   };
 
   const handleExportText = () => {
-    let textContent = `ATTENDANCE REPORT - ${selectedMonth}\n`;
-    textContent += `Unit: ${selectedUnit === 'all' ? 'All' : selectedUnit}\n`;
-    textContent += "=".repeat(80) + "\n";
-    textContent += `Emp ID\tName\tDepartment\tPresent\tAbsent\tTotal\n`;
-    textContent += "-".repeat(80) + "\n";
-
     const dataToExport = employees
       .filter(emp => {
         const dept = departments.find(d => d.id === emp.departmentId);
