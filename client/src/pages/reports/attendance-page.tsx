@@ -1,24 +1,19 @@
 import { AppLayout } from "@/components/layout/app-layout";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { 
   ClipboardList, 
-  Download, 
   Calendar, 
-  Clock, 
   Users, 
   TrendingUp, 
-  AlertTriangle, 
   Search, 
   FileSpreadsheet, 
   Building2, 
   ChevronRight, 
   ChevronDown, 
-  User as UserIcon, 
-  Mail,
   FileText,
   FileDown
 } from "lucide-react";
@@ -59,13 +54,10 @@ export default function AttendanceReportPage() {
     const monthIndex = new Date(`${monthName} 1, ${year}`).getMonth();
     const startDate = new Date(parseInt(year), monthIndex, 1);
     const endDate = new Date(parseInt(year), monthIndex + 1, 0);
-    return { startDate, endDate, monthIndex, year: parseInt(year) };
+    return { startDate, endDate };
   };
 
-  const filteredDepartments = departments.filter(d => 
-    (selectedUnit === "all" || d.unitId === parseInt(selectedUnit)) &&
-    (selectedDept === "all" || d.id === parseInt(selectedDept))
-  );
+  const { startDate, endDate } = getMonthData(selectedMonth);
 
   const filteredEmployees = employees.filter(emp => {
     const dept = departments.find(d => d.id === emp.departmentId);
@@ -77,7 +69,10 @@ export default function AttendanceReportPage() {
     return matchesUnit && matchesDept && matchesSearch;
   });
 
-  const { startDate, endDate } = getMonthData(selectedMonth);
+  const filteredDepartments = departments.filter(d => 
+    (selectedUnit === "all" || d.unitId === parseInt(selectedUnit)) &&
+    (selectedDept === "all" || d.id === parseInt(selectedDept))
+  );
 
   const getDetailedAttendance = (userId: number) => {
     const userRecords = attendanceRecords.filter(r => {
@@ -85,12 +80,13 @@ export default function AttendanceReportPage() {
       return r.userId === userId && d >= startDate && d <= endDate;
     });
     
-    const present = userRecords.filter(r => r.status === 'present').length;
-    const absent = userRecords.filter(r => r.status === 'absent').length;
-    const halfday = userRecords.filter(r => r.status === 'halfday').length;
-    const late = userRecords.filter(r => r.status === 'late').length;
-    
-    return { present, absent, halfday, late, total: userRecords.length };
+    return {
+      present: userRecords.filter(r => r.status === 'present').length,
+      absent: userRecords.filter(r => r.status === 'absent').length,
+      halfday: userRecords.filter(r => r.status === 'halfday').length,
+      late: userRecords.filter(r => r.status === 'late').length,
+      total: userRecords.length
+    };
   };
 
   const reportStats = [
@@ -99,56 +95,6 @@ export default function AttendanceReportPage() {
     { title: "Departments", value: departments.length.toString(), icon: <ClipboardList className="h-6 w-6" />, color: "bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400" },
     { title: "Present Today", value: attendanceRecords.filter(r => new Date(r.date).toDateString() === new Date().toDateString() && r.status === 'present').length.toString(), icon: <TrendingUp className="h-6 w-6" />, color: "bg-emerald-50 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400" },
   ];
-
-  const handleExportIndividualExcel = (emp: User) => {
-    const stats = getDetailedAttendance(emp.id);
-    const dept = departments.find(d => d.id === emp.departmentId);
-    
-    const data = [{
-      'Employee Name': `${emp.firstName} ${emp.lastName}`,
-      'Employee ID': emp.employeeId || '-',
-      'Department': dept?.name || '-',
-      'Position': emp.position || '-',
-      'Present Days': stats.present,
-      'Absent Days': stats.absent,
-      'Half Days': stats.halfday,
-      'Late Arrivals': stats.late,
-      'Total Recorded Days': stats.total
-    }];
-
-    const worksheet = XLSX.utils.json_to_sheet(data);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Attendance");
-    XLSX.writeFile(workbook, `attendance_${emp.firstName}_${emp.lastName}_${selectedMonth.replace(/\s+/g, '_')}.xlsx`);
-    toast({ title: "Individual Excel Exported" });
-  };
-
-  const handleExportIndividualText = (emp: User) => {
-    const stats = getDetailedAttendance(emp.id);
-    const dept = departments.find(d => d.id === emp.departmentId);
-    
-    let textContent = `INDIVIDUAL ATTENDANCE REPORT - ${selectedMonth}\n`;
-    textContent += "=".repeat(50) + "\n";
-    textContent += `Employee Name: ${emp.firstName} ${emp.lastName}\n`;
-    textContent += `Employee ID: ${emp.employeeId || '-'}\n`;
-    textContent += `Department: ${dept?.name || '-'}\n`;
-    textContent += `Position: ${emp.position || '-'}\n`;
-    textContent += "-".repeat(50) + "\n";
-    textContent += `Present Days: ${stats.present}\n`;
-    textContent += `Absent Days: ${stats.absent}\n`;
-    textContent += `Half Days: ${stats.halfday}\n`;
-    textContent += `Late Arrivals: ${stats.late}\n`;
-    textContent += `Total Recorded Days: ${stats.total}\n`;
-    textContent += "=".repeat(50) + "\n";
-
-    const blob = new Blob([textContent], { type: "text/plain" });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `attendance_${emp.firstName}_${emp.lastName}_${selectedMonth.replace(/\s+/g, '_')}.txt`;
-    a.click();
-    toast({ title: "Individual Text Exported" });
-  };
 
   const handleExportPDF = () => {
     try {
@@ -159,48 +105,28 @@ export default function AttendanceReportPage() {
         subtitle: `Period: ${selectedMonth} | Unit: ${selectedUnit === 'all' ? 'All Units' : units.find(u => u.id === parseInt(selectedUnit))?.name}` 
       });
       
-      const tableData = employees
-        .filter(emp => {
-          const dept = departments.find(d => d.id === emp.departmentId);
-          const matchesUnit = selectedUnit === 'all' || (dept && dept.unitId === parseInt(selectedUnit));
-          const matchesSearch = searchQuery === "" || 
-            `${emp.firstName} ${emp.lastName}`.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            (emp.employeeId || "").toLowerCase().includes(searchQuery.toLowerCase());
-          return matchesUnit && matchesSearch;
-        })
-        .map(emp => {
-          const stats = getDetailedAttendance(emp.id);
-          return [
-            emp.employeeId || '-',
-            `${emp.firstName} ${emp.lastName}`,
-            departments.find(d => d.id === emp.departmentId)?.name || '-',
-            stats.present.toString(),
-            stats.absent.toString(),
-            stats.halfday.toString(),
-            stats.late.toString(),
-            (stats.present + stats.absent + stats.halfday).toString()
-          ];
-        });
+      const tableData = filteredEmployees.map(emp => {
+        const stats = getDetailedAttendance(emp.id);
+        return [
+          emp.employeeId || '-',
+          `${emp.firstName} ${emp.lastName}`,
+          departments.find(d => d.id === emp.departmentId)?.name || '-',
+          stats.present.toString(),
+          stats.absent.toString(),
+          stats.halfday.toString(),
+          stats.late.toString(),
+          (stats.present + stats.absent + stats.halfday).toString()
+        ];
+      });
 
-      if (doc.autoTable) {
-        doc.autoTable({
-          head: [['Emp ID', 'Name', 'Department', 'Present', 'Absent', 'Half Day', 'Late', 'Total Days']],
-          body: tableData,
-          startY: 70,
-          headStyles: { fillColor: [15, 23, 42] as [number, number, number] },
-          alternateRowStyles: { fillColor: [245, 247, 250] as [number, number, number] },
-          margin: { top: 70 }
-        });
-      } else {
-        autoTable(doc, {
-          head: [['Emp ID', 'Name', 'Department', 'Present', 'Absent', 'Half Day', 'Late', 'Total Days']],
-          body: tableData,
-          startY: 70,
-          headStyles: { fillColor: [15, 23, 42] as [number, number, number] },
-          alternateRowStyles: { fillColor: [245, 247, 250] as [number, number, number] },
-          margin: { top: 70 }
-        });
-      }
+      autoTable(doc, {
+        head: [['Emp ID', 'Name', 'Department', 'Present', 'Absent', 'Half Day', 'Late', 'Total Days']],
+        body: tableData,
+        startY: 70,
+        headStyles: { fillColor: [15, 23, 42] as [number, number, number] },
+        alternateRowStyles: { fillColor: [245, 247, 250] as [number, number, number] },
+        margin: { top: 70 }
+      });
 
       addFooter(doc);
       const refNumber = generateReferenceNumber("ATT");
@@ -226,7 +152,7 @@ export default function AttendanceReportPage() {
       const stats = getDetailedAttendance(emp.id);
       const dept = departments.find(d => d.id === emp.departmentId);
 
-      const options = {
+      autoTable(doc, {
         startY: 70,
         head: [['Field', 'Details']],
         body: [
@@ -241,17 +167,11 @@ export default function AttendanceReportPage() {
           ['Total Recorded Days', (stats.present + stats.absent + stats.halfday).toString()],
         ],
         headStyles: { fillColor: [15, 23, 42] as [number, number, number] },
-        theme: 'striped' as const
-      };
-
-      if (doc.autoTable) {
-        doc.autoTable(options);
-      } else {
-        autoTable(doc, options);
-      }
+        theme: 'striped'
+      });
 
       addFooter(doc);
-      addHRSignature(doc, (doc as any).lastAutoTable?.finalY || 150 + 20);
+      addHRSignature(doc, (doc as any).lastAutoTable?.finalY || 170);
       const refNumber = generateReferenceNumber("IND-ATT");
       addReferenceNumber(doc, refNumber, 68);
       addDocumentDate(doc, undefined, 68);
@@ -264,29 +184,19 @@ export default function AttendanceReportPage() {
   };
 
   const handleExportExcel = () => {
-    const dataToExport = employees
-      .filter(emp => {
-        const dept = departments.find(d => d.id === emp.departmentId);
-        const matchesUnit = selectedUnit === 'all' || (dept && dept.unitId === parseInt(selectedUnit));
-        const matchesDept = selectedDept === 'all' || emp.departmentId === parseInt(selectedDept);
-        const matchesSearch = searchQuery === "" || 
-          `${emp.firstName} ${emp.lastName}`.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          (emp.employeeId || "").toLowerCase().includes(searchQuery.toLowerCase());
-        return matchesUnit && matchesDept && matchesSearch;
-      })
-      .map(emp => {
-        const stats = getDetailedAttendance(emp.id);
-        return {
-          'Employee ID': emp.employeeId || '-',
-          'Name': `${emp.firstName} ${emp.lastName}`,
-          'Department': departments.find(d => d.id === emp.departmentId)?.name || '-',
-          'Present Days': stats.present,
-          'Absent Days': stats.absent,
-          'Half Days': stats.halfday,
-          'Late Arrivals': stats.late,
-          'Total Recorded Days': (stats.present + stats.absent + stats.halfday)
-        };
-      });
+    const dataToExport = filteredEmployees.map(emp => {
+      const stats = getDetailedAttendance(emp.id);
+      return {
+        'Employee ID': emp.employeeId || '-',
+        'Name': `${emp.firstName} ${emp.lastName}`,
+        'Department': departments.find(d => d.id === emp.departmentId)?.name || '-',
+        'Present Days': stats.present,
+        'Absent Days': stats.absent,
+        'Half Days': stats.halfday,
+        'Late Arrivals': stats.late,
+        'Total Recorded Days': (stats.present + stats.absent + stats.halfday)
+      };
+    });
 
     const worksheet = XLSX.utils.json_to_sheet(dataToExport);
     const workbook = XLSX.utils.book_new();
@@ -296,20 +206,10 @@ export default function AttendanceReportPage() {
   };
 
   const handleExportText = () => {
-    const dataToExport = employees
-      .filter(emp => {
-        const dept = departments.find(d => d.id === emp.departmentId);
-        const matchesUnit = selectedUnit === 'all' || (dept && dept.unitId === parseInt(selectedUnit));
-        const matchesDept = selectedDept === 'all' || emp.departmentId === parseInt(selectedDept);
-        const matchesSearch = searchQuery === "" || 
-          `${emp.firstName} ${emp.lastName}`.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          (emp.employeeId || "").toLowerCase().includes(searchQuery.toLowerCase());
-        return matchesUnit && matchesDept && matchesSearch;
-      })
-      .map(emp => {
-        const stats = getDetailedAttendance(emp.id);
-        return `${emp.employeeId || '-'}\t${emp.firstName} ${emp.lastName}\t${departments.find(d => d.id === emp.departmentId)?.name || '-'}\t${stats.present}\t${stats.absent}\t${stats.total}\n`;
-      });
+    const dataToExport = filteredEmployees.map(emp => {
+      const stats = getDetailedAttendance(emp.id);
+      return `${emp.employeeId || '-'}\t${emp.firstName} ${emp.lastName}\t${departments.find(d => d.id === emp.departmentId)?.name || '-'}\t${stats.present}\t${stats.absent}\t${stats.total}\n`;
+    });
 
     let textContent = `ATTENDANCE REPORT - ${selectedMonth}\n`;
     textContent += `Unit: ${selectedUnit === 'all' ? 'All' : selectedUnit}\n`;
@@ -325,6 +225,29 @@ export default function AttendanceReportPage() {
     a.download = `attendance_report_${selectedMonth.replace(/\s+/g, '_')}.txt`;
     a.click();
     toast({ title: "Text File Exported" });
+  };
+
+  const handleExportIndividualExcel = (emp: User) => {
+    const stats = getDetailedAttendance(emp.id);
+    const dept = departments.find(d => d.id === emp.departmentId);
+    
+    const data = [{
+      'Employee Name': `${emp.firstName} ${emp.lastName}`,
+      'Employee ID': emp.employeeId || '-',
+      'Department': dept?.name || '-',
+      'Position': emp.position || '-',
+      'Present Days': stats.present,
+      'Absent Days': stats.absent,
+      'Half Days': stats.halfday,
+      'Late Arrivals': stats.late,
+      'Total Recorded Days': stats.total
+    }];
+
+    const worksheet = XLSX.utils.json_to_sheet(data);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Attendance");
+    XLSX.writeFile(workbook, `attendance_${emp.firstName}_${emp.lastName}_${selectedMonth.replace(/\s+/g, '_')}.xlsx`);
+    toast({ title: "Individual Excel Exported" });
   };
 
   return (
@@ -390,11 +313,9 @@ export default function AttendanceReportPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Departments</SelectItem>
-                {units.find(u => u.id.toString() === selectedUnit) ? 
-                  departments.filter(d => d.unitId === parseInt(selectedUnit)).map(d => (
-                    <SelectItem key={d.id} value={d.id.toString()}>{d.name}</SelectItem>
-                  )) : 
-                  departments.map(d => (
+                {departments
+                  .filter(d => selectedUnit === 'all' || d.unitId === parseInt(selectedUnit))
+                  .map(d => (
                     <SelectItem key={d.id} value={d.id.toString()}>{d.name}</SelectItem>
                   ))
                 }
@@ -439,26 +360,27 @@ export default function AttendanceReportPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             {filteredDepartments.map((dept) => {
-              const deptEmployees = employees.filter(e => e.departmentId === dept.id);
+              const deptEmployees = filteredEmployees.filter(e => e.departmentId === dept.id);
               const deptAttendance = attendanceRecords.filter(r => deptEmployees.some(e => e.id === r.userId));
               
+              if (deptEmployees.length === 0) return null;
+
               return (
-                <div key={dept.id} className="border rounded-lg overflow-hidden">
+                <div key={dept.id} className="border rounded-lg overflow-hidden transition-all duration-300 hover:border-teal-200">
                   <div className="w-full flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-900 border-b">
                     <div className="flex items-center gap-3">
-                      <ChevronDown className="h-4 w-4" />
-                      <span className="font-semibold text-slate-700 dark:text-slate-200">{dept.name}</span>
-                      <Badge variant="secondary" className="ml-2">
+                      <ChevronDown className="h-4 w-4 text-teal-600" />
+                      <span className="font-semibold text-slate-800 dark:text-slate-100">{dept.name}</span>
+                      <Badge variant="secondary" className="ml-2 font-medium bg-teal-50 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400">
                         {deptEmployees.length} Employees
                       </Badge>
-                      <Badge variant="outline" className="ml-2">
+                      <Badge variant="outline" className="ml-2 border-teal-200 text-teal-600">
                         {deptAttendance.length} Total Records
                       </Badge>
                     </div>
                   </div>
-                  <div className="p-2 bg-white dark:bg-slate-950 divide-y">
+                  <div className="p-0 bg-white dark:bg-slate-950 divide-y">
                     {deptEmployees
-                      .filter(e => e.firstName.toLowerCase().includes(searchQuery.toLowerCase()) || e.lastName.toLowerCase().includes(searchQuery.toLowerCase()) || (e.employeeId || "").toLowerCase().includes(searchQuery.toLowerCase()))
                       .map(emp => {
                         const stats = getDetailedAttendance(emp.id);
                         const isExpanded = expandedEmployees.has(emp.id);
@@ -467,20 +389,20 @@ export default function AttendanceReportPage() {
                           <div key={emp.id} className="flex flex-col">
                             <button
                               onClick={() => toggleEmployee(emp.id)}
-                              className="p-3 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors w-full text-left"
+                              className="p-4 flex items-center justify-between hover:bg-slate-50/80 dark:hover:bg-slate-900/80 transition-all w-full text-left"
                             >
-                              <div className="flex items-center gap-3">
-                                <div className="p-2 rounded-full bg-slate-100 dark:bg-slate-800">
-                                  {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                              <div className="flex items-center gap-4">
+                                <div className="p-2 rounded-lg bg-slate-100 dark:bg-slate-800 transition-transform duration-200">
+                                  {isExpanded ? <ChevronDown className="h-4 w-4 text-teal-600" /> : <ChevronRight className="h-4 w-4" />}
                                 </div>
                                 <div>
-                                  <p className="font-medium">{emp.firstName} {emp.lastName}</p>
-                                  <p className="text-xs text-slate-500">{emp.employeeId} | {emp.position}</p>
+                                  <p className="font-semibold text-slate-900 dark:text-slate-100">{emp.firstName} {emp.lastName}</p>
+                                  <p className="text-xs font-medium text-slate-500 uppercase tracking-tighter">{emp.employeeId} • {emp.position}</p>
                                 </div>
                               </div>
-                              <div className="flex gap-2">
-                                <Badge variant="outline" className="text-green-600 bg-green-50 dark:bg-green-950">Present: {stats.present}</Badge>
-                                <Badge variant="outline" className="text-red-600 bg-red-50 dark:bg-red-950">Absent: {stats.absent}</Badge>
+                              <div className="flex gap-3">
+                                <Badge variant="outline" className="text-emerald-600 bg-emerald-50 border-emerald-100 dark:bg-emerald-950/30 font-bold px-2 py-0.5">Present: {stats.present}</Badge>
+                                <Badge variant="outline" className="text-rose-600 bg-rose-50 border-rose-100 dark:bg-rose-950/30 font-bold px-2 py-0.5">Absent: {stats.absent}</Badge>
                               </div>
                             </button>
                             
@@ -490,39 +412,25 @@ export default function AttendanceReportPage() {
                                   initial={{ height: 0, opacity: 0 }}
                                   animate={{ height: "auto", opacity: 1 }}
                                   exit={{ height: 0, opacity: 0 }}
-                                  className="bg-slate-50/50 dark:bg-slate-900/50 p-4 border-t"
+                                  className="bg-slate-50/40 dark:bg-slate-900/40 p-5 border-t border-slate-100 dark:border-slate-800"
                                 >
-                                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-                                    <div className="bg-white dark:bg-slate-950 p-3 rounded border">
-                                      <p className="text-xs text-slate-500 uppercase font-semibold">Present</p>
-                                      <p className="text-lg font-bold">{stats.present}</p>
+                                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-5">
+                                    <div className="bg-white dark:bg-slate-950 p-4 rounded-xl border shadow-sm transition-transform hover:scale-[1.02]">
+                                      <p className="text-[10px] text-slate-400 uppercase font-bold tracking-widest mb-1">Present</p>
+                                      <p className="text-xl font-black text-emerald-600">{stats.present}</p>
                                     </div>
-                                    <div className="bg-white dark:bg-slate-950 p-3 rounded border">
-                                      <p className="text-xs text-slate-500 uppercase font-semibold">Absent</p>
-                                      <p className="text-lg font-bold">{stats.absent}</p>
-                                    </div>
-                                    <div className="bg-white dark:bg-slate-950 p-3 rounded border">
-                                      <p className="text-xs text-slate-500 uppercase font-semibold">Half Day</p>
-                                      <p className="text-lg font-bold">{stats.halfday}</p>
-                                    </div>
-                                    <div className="bg-white dark:bg-slate-950 p-3 rounded border">
-                                      <p className="text-xs text-slate-500 uppercase font-semibold">Late</p>
-                                      <p className="text-lg font-bold">{stats.late}</p>
+                                    <div className="bg-white dark:bg-slate-950 p-4 rounded-xl border shadow-sm transition-transform hover:scale-[1.02]">
+                                      <p className="text-[10px] text-slate-400 uppercase font-bold tracking-widest mb-1">Absent</p>
+                                      <p className="text-xl font-black text-rose-600">{stats.absent}</p>
                                     </div>
                                   </div>
                                   
-                                  <div className="flex justify-end gap-2">
-                                    <Button variant="outline" size="sm" className="gap-2" onClick={() => handleDownloadIndividualPDF(emp)}>
-                                      <FileDown className="h-4 w-4" /> PDF
+                                  <div className="flex justify-end gap-3">
+                                    <Button variant="outline" size="sm" className="h-8 rounded-lg text-xs font-bold gap-2 hover-elevate" onClick={() => handleDownloadIndividualPDF(emp)}>
+                                      <FileDown className="h-3.5 w-3.5" /> PDF Statement
                                     </Button>
-                                    <Button variant="outline" size="sm" className="gap-2" onClick={() => handleExportIndividualExcel(emp)}>
-                                      <FileSpreadsheet className="h-4 w-4" /> Excel
-                                    </Button>
-                                    <Button variant="outline" size="sm" className="gap-2" onClick={() => handleExportIndividualText(emp)}>
-                                      <FileText className="h-4 w-4" /> Text
-                                    </Button>
-                                    <Button variant="outline" size="sm" onClick={() => window.location.href=`/employee/${emp.id}`}>
-                                      View Full History
+                                    <Button variant="outline" size="sm" className="h-8 rounded-lg text-xs font-bold gap-2 hover-elevate" onClick={() => handleExportIndividualExcel(emp)}>
+                                      <FileSpreadsheet className="h-3.5 w-3.5" /> Excel Data
                                     </Button>
                                   </div>
                                 </motion.div>
