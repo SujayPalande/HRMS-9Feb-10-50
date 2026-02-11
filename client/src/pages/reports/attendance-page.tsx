@@ -90,6 +90,56 @@ export default function AttendanceReportPage() {
     { title: "Present Today", value: attendanceRecords.filter(r => new Date(r.date).toDateString() === new Date().toDateString() && r.status === 'present').length.toString(), icon: <TrendingUp className="h-6 w-6" />, color: "bg-emerald-50 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400" },
   ];
 
+  const handleExportIndividualExcel = (emp: User) => {
+    const stats = getDetailedAttendance(emp.id);
+    const dept = departments.find(d => d.id === emp.departmentId);
+    
+    const data = [{
+      'Employee Name': `${emp.firstName} ${emp.lastName}`,
+      'Employee ID': emp.employeeId || '-',
+      'Department': dept?.name || '-',
+      'Position': emp.position || '-',
+      'Present Days': stats.present,
+      'Absent Days': stats.absent,
+      'Half Days': stats.halfday,
+      'Late Arrivals': stats.late,
+      'Total Recorded Days': stats.total
+    }];
+
+    const worksheet = XLSX.utils.json_to_sheet(data);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Attendance");
+    XLSX.writeFile(workbook, `attendance_${emp.firstName}_${emp.lastName}_${selectedMonth.replace(/\s+/g, '_')}.xlsx`);
+    toast({ title: "Individual Excel Exported" });
+  };
+
+  const handleExportIndividualText = (emp: User) => {
+    const stats = getDetailedAttendance(emp.id);
+    const dept = departments.find(d => d.id === emp.departmentId);
+    
+    let textContent = `INDIVIDUAL ATTENDANCE REPORT - ${selectedMonth}\n`;
+    textContent += "=".repeat(50) + "\n";
+    textContent += `Employee Name: ${emp.firstName} ${emp.lastName}\n`;
+    textContent += `Employee ID: ${emp.employeeId || '-'}\n`;
+    textContent += `Department: ${dept?.name || '-'}\n`;
+    textContent += `Position: ${emp.position || '-'}\n`;
+    textContent += "-".repeat(50) + "\n";
+    textContent += `Present Days: ${stats.present}\n`;
+    textContent += `Absent Days: ${stats.absent}\n`;
+    textContent += `Half Days: ${stats.halfday}\n`;
+    textContent += `Late Arrivals: ${stats.late}\n`;
+    textContent += `Total Recorded Days: ${stats.total}\n`;
+    textContent += "=".repeat(50) + "\n";
+
+    const blob = new Blob([textContent], { type: "text/plain" });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `attendance_${emp.firstName}_${emp.lastName}_${selectedMonth.replace(/\s+/g, '_')}.txt`;
+    a.click();
+    toast({ title: "Individual Text Exported" });
+  };
+
   const handleExportPDF = () => {
     try {
       const doc = new jsPDF({ orientation: 'landscape' }) as any;
@@ -453,9 +503,15 @@ export default function AttendanceReportPage() {
                                   
                                   <div className="flex justify-end gap-2">
                                     <Button variant="outline" size="sm" className="gap-2" onClick={() => handleDownloadIndividualPDF(emp)}>
-                                      <FileDown className="h-4 w-4" /> Download PDF
+                                      <FileDown className="h-4 w-4" /> PDF
                                     </Button>
-                                    <Button variant="outline" size="sm" onClick={() => window.location.href=`/attendance?id=${emp.id}`}>
+                                    <Button variant="outline" size="sm" className="gap-2" onClick={() => handleExportIndividualExcel(emp)}>
+                                      <FileSpreadsheet className="h-4 w-4" /> Excel
+                                    </Button>
+                                    <Button variant="outline" size="sm" className="gap-2" onClick={() => handleExportIndividualText(emp)}>
+                                      <FileText className="h-4 w-4" /> Text
+                                    </Button>
+                                    <Button variant="outline" size="sm" onClick={() => window.location.href=`/employee/${emp.id}`}>
                                       View Full History
                                     </Button>
                                   </div>
