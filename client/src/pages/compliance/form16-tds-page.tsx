@@ -35,20 +35,31 @@ export default function Form16TdsPage() {
   const { data: employees = [] } = useQuery<User[]>({ queryKey: ["/api/employees"] });
   const { data: departments = [] } = useQuery<Department[]>({ queryKey: ["/api/departments"] });
   const { data: units = [] } = useQuery<Unit[]>({ queryKey: ["/api/masters/units"] });
+  const { data: payrollRecords = [] } = useQuery<any[]>({ queryKey: ["/api/payroll"] });
+
+  const [selectedUnit, setSelectedUnit] = useState("all");
+  const [selectedDept, setSelectedDept] = useState("all");
 
   const employeeTds = useMemo(() => {
     return employees
       .filter(emp => emp.isActive)
+      .filter(emp => {
+        const dept = departments.find(d => d.id === emp.departmentId);
+        const matchesUnit = selectedUnit === 'all' || (dept && dept.unitId === parseInt(selectedUnit));
+        const matchesDept = selectedDept === 'all' || emp.departmentId === parseInt(selectedDept);
+        return matchesUnit && matchesDept;
+      })
       .map(emp => {
-        const totalIncome = (emp.salary || 0) * 12;
-        const tdsDeducted = Math.round(totalIncome * 0.1); // Placeholder logic
+        const records = payrollRecords.filter(r => r.userId === emp.id);
+        const totalIncome = records.reduce((sum, r) => sum + (r.netSalary || 0), 0) || (emp.salary || 0) * 12;
+        const tdsDeducted = records.reduce((sum, r) => sum + (r.deductions?.tds || 0), 0) || Math.round(totalIncome * 0.1);
         const dept = departments.find(d => d.id === emp.departmentId);
         const unit = units.find(u => u.id === dept?.unitId);
 
         return {
           id: emp.id,
           employee: `${emp.firstName} ${emp.lastName}`,
-          pan: "ABCDE1234F", // Need actual PAN field in schema, using placeholder
+          pan: emp.panNo || "ABCDE1234F",
           totalIncome,
           tdsDeducted,
           form16: "Pending",
@@ -56,7 +67,7 @@ export default function Form16TdsPage() {
           unitName: unit?.name || "Unassigned"
         };
       });
-  }, [employees, departments, units]);
+  }, [employees, departments, units, payrollRecords, selectedUnit, selectedDept]);
 
   const [basicForm16Data, setBasicForm16Data] = useState({
     employeeName: "",
@@ -437,16 +448,45 @@ export default function Form16TdsPage() {
             <p className="text-slate-500 mt-1">Manage TDS deductions and Form 16 generation</p>
           </div>
           <div className="flex flex-wrap gap-2">
+            <div className="w-40">
+              <Select value={selectedUnit} onValueChange={setSelectedUnit}>
+                <SelectTrigger data-testid="select-unit">
+                  <SelectValue placeholder="All Units" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Units</SelectItem>
+                  {units.map(u => (
+                    <SelectItem key={u.id} value={u.id.toString()}>{u.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="w-40">
+              <Select value={selectedDept} onValueChange={setSelectedDept}>
+                <SelectTrigger data-testid="select-dept">
+                  <SelectValue placeholder="All Departments" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Departments</SelectItem>
+                  {departments
+                    .filter(d => selectedUnit === 'all' || d.unitId === parseInt(selectedUnit))
+                    .map(d => (
+                      <SelectItem key={d.id} value={d.id.toString()}>{d.name}</SelectItem>
+                    ))
+                  }
+                </SelectContent>
+              </Select>
+            </div>
             <Select value={selectedYear} onValueChange={setSelectedYear}>
               <SelectTrigger className="w-32" data-testid="select-year">
                 <Calendar className="h-4 w-4 mr-2" />
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="2025-26">2025-26</SelectItem>
                 <SelectItem value="2024-25">2024-25</SelectItem>
                 <SelectItem value="2023-24">2023-24</SelectItem>
                 <SelectItem value="2022-23">2022-23</SelectItem>
-                <SelectItem value="2021-22">2021-22</SelectItem>
               </SelectContent>
             </Select>
             <Button 

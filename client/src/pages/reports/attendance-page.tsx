@@ -293,10 +293,9 @@ export default function AttendanceReportPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="January 2026">Jan 2026</SelectItem>
+                <SelectItem value="February 2026">Feb 2026</SelectItem>
+                <SelectItem value="March 2026">Mar 2026</SelectItem>
                 <SelectItem value="December 2025">Dec 2025</SelectItem>
-                <SelectItem value="Year 2025">Year 2025</SelectItem>
-                <SelectItem value="November 2025">Nov 2025</SelectItem>
-                <SelectItem value="October 2025">Oct 2025</SelectItem>
               </SelectContent>
             </Select>
             <div className="flex bg-slate-100 dark:bg-slate-900 rounded-lg p-1 border border-slate-200 dark:border-slate-800">

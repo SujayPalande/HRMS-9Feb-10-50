@@ -177,6 +177,8 @@ export default function LeaveReportPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="January 2026">Jan 2026</SelectItem>
+                <SelectItem value="February 2026">Feb 2026</SelectItem>
+                <SelectItem value="March 2026">Mar 2026</SelectItem>
                 <SelectItem value="December 2025">Dec 2025</SelectItem>
               </SelectContent>
             </Select>
