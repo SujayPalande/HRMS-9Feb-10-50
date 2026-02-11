@@ -55,6 +55,16 @@ export default function HeadcountReportPage() {
     (selectedDept === "all" || d.id === parseInt(selectedDept))
   );
 
+  const filteredEmployees = employees.filter(emp => {
+    const dept = departments.find(d => d.id === emp.departmentId);
+    const matchesUnit = selectedUnit === 'all' || (dept && dept.unitId === parseInt(selectedUnit));
+    const matchesDept = selectedDept === 'all' || emp.departmentId === parseInt(selectedDept);
+    const matchesSearch = searchQuery === "" || 
+      `${emp.firstName} ${emp.lastName}`.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (emp.employeeId || "").toLowerCase().includes(searchQuery.toLowerCase());
+    return matchesUnit && matchesDept && matchesSearch;
+  });
+
   const getTenure = (joinDate: string | Date | null) => {
     if (!joinDate) return "N/A";
     const join = new Date(joinDate);
@@ -273,13 +283,13 @@ export default function HeadcountReportPage() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {headcountStats.map((stat, index) => (
-            <Card key={stat.title} data-testid={`card-stat-${index}`}>
+            <Card key={stat.title} data-testid={`card-stat-${index}`} className="hover-elevate transition-all duration-300">
               <CardContent className="p-6">
                 <div className="flex items-center gap-4">
-                  <div className={`p-3 rounded-lg ${stat.color}`}>{stat.icon}</div>
+                  <div className={`p-3 rounded-xl ${stat.color} shadow-sm`}>{stat.icon}</div>
                   <div>
                     <p className="text-2xl font-bold text-slate-900 dark:text-white">{stat.value}</p>
-                    <p className="text-sm text-slate-500">{stat.title}</p>
+                    <p className="text-sm font-medium text-slate-500 uppercase tracking-wider">{stat.title}</p>
                   </div>
                 </div>
               </CardContent>
@@ -307,22 +317,23 @@ export default function HeadcountReportPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             {filteredDepartments.map((dept) => {
-              const deptEmployees = employees.filter(e => e.departmentId === dept.id);
+              const deptEmployees = filteredEmployees.filter(e => e.departmentId === dept.id);
               
+              if (deptEmployees.length === 0) return null;
+
               return (
-                <div key={dept.id} className="border rounded-lg overflow-hidden">
+                <div key={dept.id} className="border rounded-lg overflow-hidden transition-all duration-300 hover:border-teal-200">
                   <div className="w-full flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-900 border-b">
                     <div className="flex items-center gap-3">
-                      <ChevronDown className="h-4 w-4" />
-                      <span className="font-semibold text-slate-700 dark:text-slate-200">{dept.name}</span>
-                      <Badge variant="secondary" className="ml-2">
+                      <ChevronDown className="h-4 w-4 text-teal-600" />
+                      <span className="font-semibold text-slate-800 dark:text-slate-100">{dept.name}</span>
+                      <Badge variant="secondary" className="ml-2 font-medium bg-teal-50 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400">
                         {deptEmployees.length} Employees
                       </Badge>
                     </div>
                   </div>
-                  <div className="p-2 bg-white dark:bg-slate-950 divide-y">
+                  <div className="p-0 bg-white dark:bg-slate-950 divide-y">
                     {deptEmployees
-                      .filter(e => e.firstName.toLowerCase().includes(searchQuery.toLowerCase()) || e.lastName.toLowerCase().includes(searchQuery.toLowerCase()))
                       .map(emp => {
                         const isExpanded = expandedEmployees.has(emp.id);
                         
@@ -330,20 +341,20 @@ export default function HeadcountReportPage() {
                           <div key={emp.id} className="flex flex-col">
                             <button
                               onClick={() => toggleEmployee(emp.id)}
-                              className="p-3 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors w-full text-left"
+                              className="p-4 flex items-center justify-between hover:bg-slate-50/80 dark:hover:bg-slate-900/80 transition-all w-full text-left"
                             >
-                              <div className="flex items-center gap-3">
-                                <div className="p-2 rounded-full bg-slate-100 dark:bg-slate-800">
-                                  {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                              <div className="flex items-center gap-4">
+                                <div className="p-2 rounded-lg bg-slate-100 dark:bg-slate-800 transition-transform duration-200">
+                                  {isExpanded ? <ChevronDown className="h-4 w-4 text-teal-600" /> : <ChevronRight className="h-4 w-4" />}
                                 </div>
                                 <div>
-                                  <p className="font-medium">{emp.firstName} {emp.lastName}</p>
-                                  <p className="text-xs text-slate-500">{emp.employeeId} | {emp.position}</p>
+                                  <p className="font-semibold text-slate-900 dark:text-slate-100">{emp.firstName} {emp.lastName}</p>
+                                  <p className="text-xs font-medium text-slate-500 uppercase tracking-tighter">{emp.employeeId} • {emp.position}</p>
                                 </div>
                               </div>
-                              <div className="flex gap-2">
-                                <Badge variant="outline" className="text-teal-600 bg-teal-50 dark:bg-teal-950">Active</Badge>
-                                <Badge variant="outline">{emp.employmentType}</Badge>
+                              <div className="flex gap-3">
+                                <Badge variant="outline" className="text-teal-600 bg-teal-50 border-teal-100 dark:bg-teal-950/30 font-bold px-2 py-0.5">Active</Badge>
+                                <Badge variant="outline" className="font-bold px-2 py-0.5">{emp.employmentType}</Badge>
                               </div>
                             </button>
                             
@@ -353,42 +364,38 @@ export default function HeadcountReportPage() {
                                   initial={{ height: 0, opacity: 0 }}
                                   animate={{ height: "auto", opacity: 1 }}
                                   exit={{ height: 0, opacity: 0 }}
-                                  className="bg-slate-50/50 dark:bg-slate-900/50 p-4 border-t"
+                                  className="bg-slate-50/40 dark:bg-slate-900/40 p-5 border-t border-slate-100 dark:border-slate-800"
                                 >
                                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                                     <div className="space-y-3">
-                                      <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Employment Details</h4>
-                                      <div className="space-y-1">
-                                        <p className="text-sm flex justify-between">
-                                          <span className="text-slate-500">Join Date:</span>
-                                          <span className="font-medium">{emp.joinDate ? new Date(emp.joinDate).toLocaleDateString() : 'N/A'}</span>
-                                        </p>
-                                        <p className="text-sm flex justify-between">
-                                          <span className="text-slate-500">Tenure:</span>
-                                          <span className="font-medium">{getTenure(emp.joinDate)}</span>
-                                        </p>
-                                        <p className="text-sm flex justify-between">
-                                          <span className="text-slate-500">Type:</span>
-                                          <span className="font-medium capitalize">{emp.employmentType}</span>
-                                        </p>
+                                      <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Employment Details</h4>
+                                      <div className="space-y-2">
+                                        <div className="flex justify-between items-center text-sm p-2 rounded-lg bg-white dark:bg-slate-950 border border-slate-100 dark:border-slate-800">
+                                          <span className="text-slate-500 font-medium">Join Date</span>
+                                          <span className="font-bold">{emp.joinDate ? new Date(emp.joinDate).toLocaleDateString() : 'N/A'}</span>
+                                        </div>
+                                        <div className="flex justify-between items-center text-sm p-2 rounded-lg bg-white dark:bg-slate-950 border border-slate-100 dark:border-slate-800">
+                                          <span className="text-slate-500 font-medium">Tenure</span>
+                                          <span className="font-bold">{getTenure(emp.joinDate)}</span>
+                                        </div>
                                       </div>
                                     </div>
                                     <div className="space-y-3">
-                                      <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Position info</h4>
-                                      <div className="space-y-1">
-                                        <p className="text-sm flex justify-between">
-                                          <span className="text-slate-500">Role:</span>
-                                          <span className="font-medium capitalize">{emp.role}</span>
-                                        </p>
-                                        <p className="text-sm flex justify-between">
-                                          <span className="text-slate-500">Work Location:</span>
-                                          <span className="font-medium">{emp.workLocation || 'Office'}</span>
-                                        </p>
+                                      <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Position info</h4>
+                                      <div className="space-y-2">
+                                        <div className="flex justify-between items-center text-sm p-2 rounded-lg bg-white dark:bg-slate-950 border border-slate-100 dark:border-slate-800">
+                                          <span className="text-slate-500 font-medium">Role</span>
+                                          <span className="font-bold capitalize">{emp.role}</span>
+                                        </div>
+                                        <div className="flex justify-between items-center text-sm p-2 rounded-lg bg-white dark:bg-slate-950 border border-slate-100 dark:border-slate-800">
+                                          <span className="text-slate-500 font-medium">Location</span>
+                                          <span className="font-bold">{emp.workLocation || 'Office'}</span>
+                                        </div>
                                       </div>
                                     </div>
                                     <div className="flex items-end justify-end">
-                                      <Button variant="outline" size="sm" onClick={() => window.location.href=`/employee/${emp.id}`}>
-                                        View Full Employee Profile
+                                      <Button variant="outline" size="sm" className="h-8 rounded-lg text-xs font-bold gap-2 hover-elevate" onClick={() => window.location.href=`/employee/${emp.id}`}>
+                                        Full Profile
                                       </Button>
                                     </div>
                                   </div>

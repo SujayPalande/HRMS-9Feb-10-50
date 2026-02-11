@@ -67,6 +67,16 @@ export default function AttendanceReportPage() {
     (selectedDept === "all" || d.id === parseInt(selectedDept))
   );
 
+  const filteredEmployees = employees.filter(emp => {
+    const dept = departments.find(d => d.id === emp.departmentId);
+    const matchesUnit = selectedUnit === 'all' || (dept && dept.unitId === parseInt(selectedUnit));
+    const matchesDept = selectedDept === 'all' || emp.departmentId === parseInt(selectedDept);
+    const matchesSearch = searchQuery === "" || 
+      `${emp.firstName} ${emp.lastName}`.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (emp.employeeId || "").toLowerCase().includes(searchQuery.toLowerCase());
+    return matchesUnit && matchesDept && matchesSearch;
+  });
+
   const { startDate, endDate } = getMonthData(selectedMonth);
 
   const getDetailedAttendance = (userId: number) => {
@@ -395,13 +405,13 @@ export default function AttendanceReportPage() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {reportStats.map((stat, index) => (
-            <Card key={stat.title} data-testid={`card-stat-${index}`}>
+            <Card key={stat.title} data-testid={`card-stat-${index}`} className="hover-elevate transition-all duration-300">
               <CardContent className="p-6">
                 <div className="flex items-center gap-4">
-                  <div className={`p-3 rounded-lg ${stat.color}`}>{stat.icon}</div>
+                  <div className={`p-3 rounded-xl ${stat.color} shadow-sm`}>{stat.icon}</div>
                   <div>
                     <p className="text-2xl font-bold text-slate-900 dark:text-white">{stat.value}</p>
-                    <p className="text-sm text-slate-500">{stat.title}</p>
+                    <p className="text-sm font-medium text-slate-500 uppercase tracking-wider">{stat.title}</p>
                   </div>
                 </div>
               </CardContent>

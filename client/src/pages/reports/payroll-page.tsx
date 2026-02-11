@@ -56,6 +56,16 @@ export default function PayrollReportPage() {
     (selectedDept === "all" || d.id === parseInt(selectedDept))
   );
 
+  const filteredEmployees = employees.filter(emp => {
+    const dept = departments.find(d => d.id === emp.departmentId);
+    const matchesUnit = selectedUnit === 'all' || (dept && dept.unitId === parseInt(selectedUnit));
+    const matchesDept = selectedDept === 'all' || emp.departmentId === parseInt(selectedDept);
+    const matchesSearch = searchQuery === "" || 
+      `${emp.firstName} ${emp.lastName}`.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (emp.employeeId || "").toLowerCase().includes(searchQuery.toLowerCase());
+    return matchesUnit && matchesDept && matchesSearch;
+  });
+
   const getDetailedPayroll = (userId: number) => {
     // Sync logic: Use payment records for the selected month
     const records = paymentRecords.filter(r => r.employeeId === userId && r.month === selectedMonth);
@@ -363,13 +373,13 @@ export default function PayrollReportPage() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {payrollStats.map((stat, index) => (
-            <Card key={stat.title} data-testid={`card-stat-${index}`}>
+            <Card key={stat.title} data-testid={`card-stat-${index}`} className="hover-elevate transition-all duration-300">
               <CardContent className="p-6">
                 <div className="flex items-center gap-4">
-                  <div className={`p-3 rounded-lg ${stat.color}`}>{stat.icon}</div>
+                  <div className={`p-3 rounded-xl ${stat.color} shadow-sm`}>{stat.icon}</div>
                   <div>
                     <p className="text-2xl font-bold text-slate-900 dark:text-white">{stat.value}</p>
-                    <p className="text-sm text-slate-500">{stat.title}</p>
+                    <p className="text-sm font-medium text-slate-500 uppercase tracking-wider">{stat.title}</p>
                   </div>
                 </div>
               </CardContent>
@@ -397,26 +407,27 @@ export default function PayrollReportPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             {filteredDepartments.map((dept) => {
-              const deptEmployees = employees.filter(e => e.departmentId === dept.id);
+              const deptEmployees = filteredEmployees.filter(e => e.departmentId === dept.id);
               const deptPayrollTotal = deptEmployees.reduce((sum, emp) => sum + (getDetailedPayroll(emp.id).totalAmount || 0), 0);
               
+              if (deptEmployees.length === 0) return null;
+
               return (
-                <div key={dept.id} className="border rounded-lg overflow-hidden">
+                <div key={dept.id} className="border rounded-lg overflow-hidden transition-all duration-300 hover:border-teal-200">
                   <div className="w-full flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-900 border-b">
                     <div className="flex items-center gap-3">
-                      <ChevronDown className="h-4 w-4" />
-                      <span className="font-semibold text-slate-700 dark:text-slate-200">{dept.name}</span>
-                      <Badge variant="secondary" className="ml-2">
+                      <ChevronDown className="h-4 w-4 text-teal-600" />
+                      <span className="font-semibold text-slate-800 dark:text-slate-100">{dept.name}</span>
+                      <Badge variant="secondary" className="ml-2 font-medium bg-teal-50 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400">
                         {deptEmployees.length} Employees
                       </Badge>
-                      <Badge variant="outline" className="ml-2">
+                      <Badge variant="outline" className="ml-2 border-teal-200 text-teal-600">
                         Total Dept Payroll: ₹{deptPayrollTotal.toLocaleString()}
                       </Badge>
                     </div>
                   </div>
-                  <div className="p-2 bg-white dark:bg-slate-950 divide-y">
+                  <div className="p-0 bg-white dark:bg-slate-950 divide-y">
                     {deptEmployees
-                      .filter(e => e.firstName.toLowerCase().includes(searchQuery.toLowerCase()) || e.lastName.toLowerCase().includes(searchQuery.toLowerCase()))
                       .map(emp => {
                         const payroll = getDetailedPayroll(emp.id);
                         const isExpanded = expandedEmployees.has(emp.id);
@@ -425,19 +436,19 @@ export default function PayrollReportPage() {
                           <div key={emp.id} className="flex flex-col">
                             <button
                               onClick={() => toggleEmployee(emp.id)}
-                              className="p-3 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors w-full text-left"
+                              className="p-4 flex items-center justify-between hover:bg-slate-50/80 dark:hover:bg-slate-900/80 transition-all w-full text-left"
                             >
-                              <div className="flex items-center gap-3">
-                                <div className="p-2 rounded-full bg-slate-100 dark:bg-slate-800">
-                                  {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                              <div className="flex items-center gap-4">
+                                <div className="p-2 rounded-lg bg-slate-100 dark:bg-slate-800 transition-transform duration-200">
+                                  {isExpanded ? <ChevronDown className="h-4 w-4 text-teal-600" /> : <ChevronRight className="h-4 w-4" />}
                                 </div>
                                 <div>
-                                  <p className="font-medium">{emp.firstName} {emp.lastName}</p>
-                                  <p className="text-xs text-slate-500">{emp.employeeId} | {emp.position}</p>
+                                  <p className="font-semibold text-slate-900 dark:text-slate-100">{emp.firstName} {emp.lastName}</p>
+                                  <p className="text-xs font-medium text-slate-500 uppercase tracking-tighter">{emp.employeeId} • {emp.position}</p>
                                 </div>
                               </div>
-                              <div className="flex gap-2">
-                                <Badge variant="outline" className="text-teal-600 bg-teal-50 dark:bg-teal-950 font-bold">₹{payroll.totalAmount.toLocaleString()}</Badge>
+                              <div className="flex gap-3">
+                                <Badge variant="outline" className="text-teal-600 bg-teal-50 border-teal-100 dark:bg-teal-950/30 font-black px-2 py-0.5">₹{payroll.totalAmount.toLocaleString()}</Badge>
                               </div>
                             </button>
                             
@@ -447,29 +458,29 @@ export default function PayrollReportPage() {
                                   initial={{ height: 0, opacity: 0 }}
                                   animate={{ height: "auto", opacity: 1 }}
                                   exit={{ height: 0, opacity: 0 }}
-                                  className="bg-slate-50/50 dark:bg-slate-900/50 p-4 border-t"
+                                  className="bg-slate-50/40 dark:bg-slate-900/40 p-5 border-t border-slate-100 dark:border-slate-800"
                                 >
-                                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                    <div className="bg-white dark:bg-slate-950 p-3 rounded border">
-                                      <p className="text-xs text-slate-500 uppercase font-semibold">Base Salary (Sync)</p>
-                                      <p className="text-lg font-bold">₹{(emp.salary || 0).toLocaleString()}</p>
+                                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-5">
+                                    <div className="bg-white dark:bg-slate-950 p-4 rounded-xl border shadow-sm transition-transform hover:scale-[1.02]">
+                                      <p className="text-[10px] text-slate-400 uppercase font-bold tracking-widest mb-1">Base Salary</p>
+                                      <p className="text-xl font-black">₹{(emp.salary || 0).toLocaleString()}</p>
                                     </div>
-                                    <div className="bg-white dark:bg-slate-950 p-3 rounded border">
-                                      <p className="text-xs text-slate-500 uppercase font-semibold">Payment Status</p>
-                                      <p className="text-lg font-bold">{payroll.count > 0 ? 'Disbursed' : 'In Progress'}</p>
+                                    <div className="bg-white dark:bg-slate-950 p-4 rounded-xl border shadow-sm transition-transform hover:scale-[1.02]">
+                                      <p className="text-[10px] text-slate-400 uppercase font-bold tracking-widest mb-1">Status</p>
+                                      <p className="text-xl font-black text-teal-600">{payroll.count > 0 ? 'Disbursed' : 'In Progress'}</p>
                                     </div>
-                                    <div className="bg-white dark:bg-slate-950 p-3 rounded border">
-                                      <p className="text-xs text-slate-500 uppercase font-semibold">Reference No</p>
-                                      <p className="text-lg font-bold">{payroll.lastRefNo || 'N/A'}</p>
+                                    <div className="bg-white dark:bg-slate-950 p-4 rounded-xl border shadow-sm transition-transform hover:scale-[1.02]">
+                                      <p className="text-[10px] text-slate-400 uppercase font-bold tracking-widest mb-1">Ref No</p>
+                                      <p className="text-xl font-black">{payroll.lastRefNo || 'N/A'}</p>
                                     </div>
                                   </div>
                                   
-                                  <div className="mt-4 flex justify-end gap-2">
-                                    <Button variant="outline" size="sm" className="gap-2" onClick={() => handleDownloadIndividualPDF(emp)}>
-                                      <FileDown className="h-4 w-4" /> Download PDF
+                                  <div className="flex justify-end gap-3">
+                                    <Button variant="outline" size="sm" className="h-8 rounded-lg text-xs font-bold gap-2 hover-elevate" onClick={() => handleDownloadIndividualPDF(emp)}>
+                                      <FileDown className="h-3.5 w-3.5" /> PDF Statement
                                     </Button>
-                                    <Button variant="outline" size="sm" onClick={() => window.location.href=`/payroll/payslips?id=${emp.id}`}>
-                                      View Detailed Payslip
+                                    <Button variant="outline" size="sm" className="h-8 rounded-lg text-xs font-bold hover-elevate" onClick={() => window.location.href=`/payroll/payslips?id=${emp.id}`}>
+                                      Detailed Payslip
                                     </Button>
                                   </div>
                                 </motion.div>
