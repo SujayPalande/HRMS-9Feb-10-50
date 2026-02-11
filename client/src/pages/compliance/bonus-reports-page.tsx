@@ -9,7 +9,7 @@ import { useQuery } from "@tanstack/react-query";
 import { User, Department, Unit } from "@shared/schema";
 import * as XLSX from 'xlsx';
 import { useToast } from "@/hooks/use-toast";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 
 export default function BonusReportsPage() {
   const [selectedUnit, setSelectedUnit] = useState("all");
