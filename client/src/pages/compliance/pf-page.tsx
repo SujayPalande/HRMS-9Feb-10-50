@@ -44,9 +44,9 @@ export default function PfPage() {
     return employees
       .filter(emp => emp.isActive && emp.salary && emp.salary > 0)
       .map(emp => {
-        const salary = emp.salary!;
-        const monthlyCTC = salary / 12;
-        const basicSalary = Math.round(monthlyCTC * (salaryComponents.basicSalaryPercentage / 100));
+        const monthlyCTC = emp.salary!;
+        const grossSalary = Math.round((monthlyCTC / 30) * 25);
+        const basicSalary = Math.round(grossSalary * (salaryComponents.basicSalaryPercentage / 100));
         const employeeContrib = Math.round(basicSalary * 0.12);
         const employerContrib = Math.round(basicSalary * 0.12);
         const edliContrib = Math.round(basicSalary * 0.005);

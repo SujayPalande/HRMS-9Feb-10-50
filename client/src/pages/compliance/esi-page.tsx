@@ -24,9 +24,14 @@ export default function EsiPage() {
   
   const esiData = useMemo(() => {
     return employees
-      .filter(emp => emp.isActive && emp.salary && emp.salary > 0 && (emp.salary / 12) <= 21000)
+      .filter(emp => emp.isActive && emp.salary && emp.salary > 0)
       .map(emp => {
-        const grossSalary = Math.round(emp.salary! / 12);
+        const monthlyCTC = emp.salary!;
+        const grossSalary = Math.round((monthlyCTC / 30) * 25);
+        
+        // ESI eligibility is on gross salary <= 21000
+        if (grossSalary > 21000) return null;
+
         const employeeContrib = Math.round(grossSalary * 0.0075);
         const employerContrib = Math.round(grossSalary * 0.0325);
         return {
@@ -36,7 +41,8 @@ export default function EsiPage() {
           employerContrib,
           total: employeeContrib + employerContrib
         };
-      });
+      })
+      .filter((item): item is NonNullable<typeof item> => item !== null);
   }, [employees]);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
