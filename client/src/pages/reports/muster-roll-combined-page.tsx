@@ -856,24 +856,29 @@ export default function MusterRollCombinedPage() {
                                         <TableCell className="text-center border-r text-slate-600 font-medium whitespace-nowrap">{age}/{emp.gender?.[0] || "M"}</TableCell>
                                         <TableCell className="border-r text-slate-600 font-medium">{emp.position || "-"}</TableCell>
                                         <TableCell className="text-center border-r text-slate-600 font-medium">{emp.joinDate ? new Date(emp.joinDate).toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: '2-digit' }) : "-"}</TableCell>
-                                        {Array.from({ length: daysInMonth }, (_, i) => (
-                                          <TableCell key={i} className={cn(
-                                            "text-center p-1 border-r text-[10px] font-black",
-                                            getAttendanceForDay(emp.id, i + 1) === 'P' ? "text-emerald-600 bg-emerald-50/20" : 
-                                            getAttendanceForDay(emp.id, i + 1) === 'A' ? "text-rose-600 bg-rose-50/20" : "text-slate-400"
-                                          )}>
-                                            {getAttendanceForDay(emp.id, i + 1)}
-                                          </TableCell>
-                                        ))}
-                                        <TableCell className="text-center font-black border-l bg-slate-50/50 text-slate-900">{data.totalDaysWorked}</TableCell>
-                                        <TableCell className="text-right border-l font-bold text-slate-700">₹{data.dailyRate.toLocaleString()}</TableCell>
+                                        {Array.from({ length: daysInMonth }, (_, i) => {
+                                          const status = getAttendanceForDay(emp.id, i + 1);
+                                          return (
+                                            <TableCell key={i} className={cn(
+                                              "text-center p-1 border-r text-[10px] font-black",
+                                              status === 'P' ? "text-emerald-600 bg-emerald-50/20" : 
+                                              status === 'A' ? "text-rose-600 bg-rose-50/20" : "text-slate-400"
+                                            )}>
+                                              {status}
+                                            </TableCell>
+                                          );
+                                        })}
+                                        <TableCell className="text-center font-black border-l bg-slate-50/50 text-slate-900">
+                                          {Number(data.totalDaysWorked).toFixed(1)}
+                                        </TableCell>
+                                        <TableCell className="text-right border-l font-bold text-slate-700 whitespace-nowrap">₹{data.dailyRate.toLocaleString()}</TableCell>
                                         <TableCell className="text-center border-l font-bold text-slate-700">{data.overtimeHours}</TableCell>
-                                        <TableCell className="text-right border-l font-bold text-slate-700">₹{data.normalWages.toLocaleString()}</TableCell>
-                                        <TableCell className="text-right border-l font-bold text-slate-700">₹{data.hraPayable.toLocaleString()}</TableCell>
-                                        <TableCell className="text-right border-l font-bold text-slate-700">₹{data.overtimePayable.toLocaleString()}</TableCell>
-                                        <TableCell className="text-right border-l font-black text-slate-900 dark:text-slate-100 bg-slate-50/30">₹{data.grossWages.toLocaleString()}</TableCell>
-                                        <TableCell className="text-right border-l font-bold text-rose-600 bg-rose-50/10">₹{data.deductions.toLocaleString()}</TableCell>
-                                        <TableCell className="text-right border-l font-black text-teal-700 bg-teal-50/50 dark:bg-teal-900/20 shadow-inner">₹{data.netWages.toLocaleString()}</TableCell>
+                                        <TableCell className="text-right border-l font-bold text-slate-700 whitespace-nowrap">₹{data.normalWages.toLocaleString()}</TableCell>
+                                        <TableCell className="text-right border-l font-bold text-slate-700 whitespace-nowrap">₹{data.hraPayable.toLocaleString()}</TableCell>
+                                        <TableCell className="text-right border-l font-bold text-slate-700 whitespace-nowrap">₹{data.overtimePayable.toLocaleString()}</TableCell>
+                                        <TableCell className="text-right border-l font-black text-slate-900 dark:text-slate-100 bg-slate-50/30 whitespace-nowrap">₹{data.grossWages.toLocaleString()}</TableCell>
+                                        <TableCell className="text-right border-l font-bold text-rose-600 bg-rose-50/10 whitespace-nowrap">₹{data.deductions.toLocaleString()}</TableCell>
+                                        <TableCell className="text-right border-l font-black text-teal-700 bg-teal-50/50 dark:bg-teal-900/20 shadow-inner whitespace-nowrap">₹{data.netWages.toLocaleString()}</TableCell>
                                       </TableRow>
                                     );
                                   })

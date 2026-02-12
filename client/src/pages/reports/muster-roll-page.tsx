@@ -162,25 +162,31 @@ export default function MusterRollPage() {
   };
 
   const calculateEmployeeData = (employee: Employee) => {
-    let totalDaysWorked = 0;
-    let totalHoursWorked = 0;
-    let overtimeHours = 0;
+    let totalDaysWorked_raw = 0;
+    let totalHoursWorked_raw = 0;
+    let overtimeHours_raw = 0;
 
     for (let day = 1; day <= daysInMonth; day++) {
       const status = getAttendanceForDay(employee.id, day);
       if (status === "P") {
-        totalDaysWorked++;
+        totalDaysWorked_raw++;
         const hours = getHoursWorkedForDay(employee.id, day);
-        totalHoursWorked += hours;
-        if (hours > 8) overtimeHours += hours - 8;
+        totalHoursWorked_raw += hours;
+        if (hours > 8) overtimeHours_raw += hours - 8;
       } else if (status === "H") {
-        totalDaysWorked += 0.5;
-        totalHoursWorked += 4;
+        totalDaysWorked_raw += 0.5;
+        totalHoursWorked_raw += 4;
       }
     }
 
     const payrollData = getPayrollForEmployee(employee.id);
     const totalDaysInMonth = daysInMonth;
+    const totalDaysWorked = Number(totalDaysWorked_raw.toFixed(1));
+    const totalHoursWorked = totalHoursWorked_raw;
+    const overtimeHours = overtimeHours_raw;
+
+    const basicSalary = employee.basicSalary || 0;
+    const hra = employee.hra || 0;
     const proRatedBasic = Math.round((basicSalary / totalDaysInMonth) * totalDaysWorked);
     const proRatedHra = Math.round((hra / totalDaysInMonth) * totalDaysWorked);
     
@@ -198,7 +204,7 @@ export default function MusterRollPage() {
     const netWages = Math.max(0, payrollData?.netSalary || (grossWages - totalDeductions));
 
     return {
-      totalDaysWorked: Number(totalDaysWorked.toFixed(1)),
+      totalDaysWorked,
       totalHoursWorked,
       overtimeHours,
       dailyRate: Math.round(dailyRate),
