@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { AppLayout } from "@/components/layout/app-layout";
 import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { motion } from "framer-motion";
 import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -130,7 +131,11 @@ export default function MusterRollPage() {
   const getAttendanceForDay = (employeeId: number, day: number): string => {
     const dateStr = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
     const record = attendanceRecords.find(
-      (a) => a.userId === employeeId && a.date === dateStr
+      (a) => {
+        const recordDate = new Date(a.date);
+        const recordDateStr = `${recordDate.getFullYear()}-${String(recordDate.getMonth() + 1).padStart(2, '0')}-${String(recordDate.getDate()).padStart(2, '0')}`;
+        return a.userId === employeeId && recordDateStr === dateStr;
+      }
     );
     if (!record) return "-";
     switch (record.status) {
@@ -147,7 +152,11 @@ export default function MusterRollPage() {
   const getHoursWorkedForDay = (employeeId: number, day: number): number => {
     const dateStr = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
     const record = attendanceRecords.find(
-      (a) => a.userId === employeeId && a.date === dateStr
+      (a) => {
+        const recordDate = new Date(a.date);
+        const recordDateStr = `${recordDate.getFullYear()}-${String(recordDate.getMonth() + 1).padStart(2, '0')}-${String(recordDate.getDate()).padStart(2, '0')}`;
+        return a.userId === employeeId && recordDateStr === dateStr;
+      }
     );
     return record?.hoursWorked || 0;
   };
@@ -171,27 +180,29 @@ export default function MusterRollPage() {
     }
 
     const payrollData = getPayrollForEmployee(employee.id);
-    const basicSalary = payrollData?.basicSalary || employee.basicSalary || employee.salary || 15000;
-    const hra = payrollData?.hra || employee.hra || Math.round(basicSalary * 0.4);
+    const totalDaysInMonth = daysInMonth;
+    const proRatedBasic = Math.round((basicSalary / totalDaysInMonth) * totalDaysWorked);
+    const proRatedHra = Math.round((hra / totalDaysInMonth) * totalDaysWorked);
+    
     const dailyRate = basicSalary / 26;
     const hourlyRate = dailyRate / 8;
-    const normalWages = Math.round(dailyRate * totalDaysWorked);
-    const hraPayable = Math.round((hra / 26) * totalDaysWorked);
+    const normalWages = proRatedBasic;
+    const hraPayable = proRatedHra;
     const overtimePayable = Math.round(totalHoursWorked > 0 ? (overtimeHours * hourlyRate * 2) : 0);
     const allowances = payrollData?.allowances || 0;
     const grossWages = normalWages + hraPayable + overtimePayable + allowances;
-    const pfDeduction = payrollData?.pfContribution || Math.round(basicSalary * 0.12);
+    const pfDeduction = payrollData?.pfContribution || Math.round(proRatedBasic * 0.12);
     const esiDeduction = payrollData?.esiContribution || (grossWages <= 21000 ? Math.round(grossWages * 0.0075) : 0);
     const otherDeductions = payrollData?.deductions || 0;
     const totalDeductions = pfDeduction + esiDeduction + otherDeductions;
-    const netWages = payrollData?.netSalary || (grossWages - totalDeductions);
+    const netWages = Math.max(0, payrollData?.netSalary || (grossWages - totalDeductions));
 
     return {
-      totalDaysWorked,
+      totalDaysWorked: Number(totalDaysWorked.toFixed(1)),
       totalHoursWorked,
       overtimeHours,
       dailyRate: Math.round(dailyRate),
-      basicSalary,
+      basicSalary: proRatedBasic,
       normalWages,
       hraPayable,
       overtimePayable,
@@ -287,26 +298,30 @@ export default function MusterRollPage() {
     <AppLayout>
       <div className="h-full overflow-auto">
         <div className="p-6 space-y-6">
-          <div className="flex items-center justify-between">
+          <motion.div 
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="flex items-center justify-between"
+          >
             <div>
-              <h1 className="text-2xl font-bold" data-testid="text-page-title">Muster Roll - Form II</h1>
-              <p className="text-muted-foreground">Maharashtra Factories Rules - Muster Roll cum Wage Register</p>
+              <h1 className="text-3xl font-black tracking-tight text-slate-900 dark:text-white" data-testid="text-page-title">Muster Roll & Wage Register</h1>
+              <p className="text-slate-500 font-medium">Maharashtra Factories Rules • Form II Compliance</p>
             </div>
             <div className="flex flex-wrap gap-2">
-              <Button variant="outline" onClick={handlePrint} data-testid="button-print">
+              <Button variant="outline" className="hover-elevate font-bold shadow-sm" onClick={handlePrint} data-testid="button-print">
                 <Printer className="h-4 w-4 mr-2" />
                 Print
               </Button>
-              <Button variant="outline" onClick={exportToPDF} data-testid="button-export-pdf">
+              <Button variant="outline" className="hover-elevate font-bold shadow-sm text-teal-600 border-teal-200" onClick={exportToPDF} data-testid="button-export-pdf">
                 <FileText className="h-4 w-4 mr-2" />
                 Export PDF
               </Button>
-              <Button onClick={exportToExcel} data-testid="button-export-excel">
+              <Button className="hover-elevate font-bold shadow-md bg-teal-600 hover:bg-teal-700" onClick={exportToExcel} data-testid="button-export-excel">
                 <FileSpreadsheet className="h-4 w-4 mr-2" />
                 Export Excel
               </Button>
             </div>
-          </div>
+          </motion.div>
 
           <Card>
             <CardHeader>
@@ -435,36 +450,36 @@ export default function MusterRollPage() {
                             Department: {deptName}
                           </h3>
                           
-                          <div className="overflow-x-auto rounded-lg border border-slate-200">
+                          <div className="overflow-x-auto rounded-xl border border-slate-200 shadow-sm bg-white dark:bg-slate-950">
                             <Table className="text-xs">
                               <TableHeader>
-                                <TableRow>
-                                  <TableHead className="text-center w-10" rowSpan={2}>Sl No</TableHead>
-                                  <TableHead className="min-w-[150px]" rowSpan={2}>Full name of employee</TableHead>
-                                  <TableHead className="text-center w-16" rowSpan={2}>Age/Sex</TableHead>
-                                  <TableHead className="min-w-[100px]" rowSpan={2}>Designation</TableHead>
+                                <TableRow className="bg-slate-50 dark:bg-slate-900">
+                                  <TableHead className="text-center w-10 border-r" rowSpan={2}>Sl No</TableHead>
+                                  <TableHead className="min-w-[150px] border-r" rowSpan={2}>Full name of employee</TableHead>
+                                  <TableHead className="text-center w-16 border-r" rowSpan={2}>Age/Sex</TableHead>
+                                  <TableHead className="min-w-[100px] border-r" rowSpan={2}>Designation</TableHead>
                                   {viewType === "muster" ? (
                                     <>
-                                      <TableHead className="text-center" colSpan={daysInMonth}>Attendance</TableHead>
-                                      <TableHead className="text-center w-12" rowSpan={2}>Days</TableHead>
+                                      <TableHead className="text-center border-b" colSpan={daysInMonth}>Attendance Details</TableHead>
+                                      <TableHead className="text-center w-12 border-l" rowSpan={2}>Total Days</TableHead>
                                     </>
                                   ) : (
                                     <>
-                                      <TableHead className="text-center" colSpan={15}>Attendance (1-15)</TableHead>
-                                      <TableHead className="text-center w-12" rowSpan={2}>Days</TableHead>
-                                      <TableHead className="text-center w-16" rowSpan={2}>Basic Wages</TableHead>
-                                      <TableHead className="text-center w-14" rowSpan={2}>HRA</TableHead>
-                                      <TableHead className="text-center w-14" rowSpan={2}>PF</TableHead>
-                                      <TableHead className="text-center w-14" rowSpan={2}>ESI</TableHead>
-                                      <TableHead className="text-center w-16" rowSpan={2}>Gross</TableHead>
-                                      <TableHead className="text-center w-14" rowSpan={2}>Ded.</TableHead>
-                                      <TableHead className="text-center w-16" rowSpan={2}>Net</TableHead>
+                                      <TableHead className="text-center border-b" colSpan={15}>Attendance (1-15)</TableHead>
+                                      <TableHead className="text-center w-12 border-l" rowSpan={2}>Days</TableHead>
+                                      <TableHead className="text-center w-20 border-l" rowSpan={2}>Basic Wages</TableHead>
+                                      <TableHead className="text-center w-16 border-l" rowSpan={2}>HRA</TableHead>
+                                      <TableHead className="text-center w-16 border-l" rowSpan={2}>PF</TableHead>
+                                      <TableHead className="text-center w-16 border-l" rowSpan={2}>ESI</TableHead>
+                                      <TableHead className="text-center w-20 border-l" rowSpan={2}>Gross</TableHead>
+                                      <TableHead className="text-center w-16 border-l" rowSpan={2}>Ded.</TableHead>
+                                      <TableHead className="text-center w-24 border-l bg-teal-50 dark:bg-teal-900/20" rowSpan={2}>Net Amount</TableHead>
                                     </>
                                   )}
                                 </TableRow>
-                                <TableRow>
+                                <TableRow className="bg-slate-50/50 dark:bg-slate-900/50">
                                   {Array.from({ length: (viewType === "muster" ? daysInMonth : 15) }, (_, i) => (
-                                    <TableHead key={i} className="text-center w-8 p-1">{i + 1}</TableHead>
+                                    <TableHead key={i} className="text-center w-8 p-1 border-r text-[10px] font-bold">{i + 1}</TableHead>
                                   ))}
                                 </TableRow>
                               </TableHeader>
@@ -475,24 +490,30 @@ export default function MusterRollPage() {
                                   const age = dob ? Math.floor((new Date().getTime() - dob.getTime()) / (365.25 * 24 * 60 * 60 * 1000)) : "-";
 
                                   return (
-                                    <TableRow key={emp.id} data-testid={`row-employee-${emp.id}`}>
-                                      <TableCell className="text-center">{index + 1}</TableCell>
-                                      <TableCell className="font-medium">{emp.firstName} {emp.lastName}</TableCell>
-                                      <TableCell className="text-center">{age}/{emp.gender?.[0] || "M"}</TableCell>
-                                      <TableCell>{emp.position || "Worker"}</TableCell>
+                                    <TableRow key={emp.id} data-testid={`row-employee-${emp.id}`} className="hover:bg-slate-50/50 transition-colors">
+                                      <TableCell className="text-center border-r font-medium text-slate-500">{index + 1}</TableCell>
+                                      <TableCell className="font-semibold border-r text-slate-900 dark:text-slate-100 min-w-[180px]">{emp.firstName} {emp.lastName}</TableCell>
+                                      <TableCell className="text-center border-r text-slate-600 font-medium whitespace-nowrap">{age}/{emp.gender?.[0] || "M"}</TableCell>
+                                      <TableCell className="border-r text-slate-600 font-medium">{emp.position || "Worker"}</TableCell>
                                       {Array.from({ length: (viewType === "muster" ? daysInMonth : 15) }, (_, i) => (
-                                        <TableCell key={i} className="text-center p-1 border-x">{getAttendanceForDay(emp.id, i + 1)}</TableCell>
+                                        <TableCell key={i} className={cn(
+                                          "text-center p-1 border-r text-[10px] font-black",
+                                          getAttendanceForDay(emp.id, i + 1) === 'P' ? "text-emerald-600 bg-emerald-50/20" : 
+                                          getAttendanceForDay(emp.id, i + 1) === 'A' ? "text-rose-600 bg-rose-50/20" : "text-slate-400"
+                                        )}>
+                                          {getAttendanceForDay(emp.id, i + 1)}
+                                        </TableCell>
                                       ))}
-                                      <TableCell className="text-center font-bold">{data.totalDaysWorked}</TableCell>
+                                      <TableCell className="text-center font-black border-l bg-slate-50/50 text-slate-900">{data.totalDaysWorked}</TableCell>
                                       {viewType === "wage" && (
                                         <>
-                                          <TableCell className="text-right">₹{data.basicSalary.toLocaleString()}</TableCell>
-                                          <TableCell className="text-right">₹{data.hraPayable.toLocaleString()}</TableCell>
-                                          <TableCell className="text-right">₹{data.pfDeduction.toLocaleString()}</TableCell>
-                                          <TableCell className="text-right">₹{data.esiDeduction.toLocaleString()}</TableCell>
-                                          <TableCell className="text-right font-medium">₹{data.grossWages.toLocaleString()}</TableCell>
-                                          <TableCell className="text-right">₹{data.totalDeductions.toLocaleString()}</TableCell>
-                                          <TableCell className="text-right font-bold text-teal-600">₹{data.netWages.toLocaleString()}</TableCell>
+                                          <TableCell className="text-right border-l font-bold text-slate-700">₹{data.basicSalary.toLocaleString()}</TableCell>
+                                          <TableCell className="text-right border-l font-bold text-slate-700">₹{data.hraPayable.toLocaleString()}</TableCell>
+                                          <TableCell className="text-right border-l font-bold text-amber-600 bg-amber-50/10">₹{data.pfDeduction.toLocaleString()}</TableCell>
+                                          <TableCell className="text-right border-l font-bold text-amber-600 bg-amber-50/10">₹{data.esiDeduction.toLocaleString()}</TableCell>
+                                          <TableCell className="text-right border-l font-black text-slate-900 dark:text-slate-100 bg-slate-50/30">₹{data.grossWages.toLocaleString()}</TableCell>
+                                          <TableCell className="text-right border-l font-bold text-rose-600 bg-rose-50/10">₹{data.totalDeductions.toLocaleString()}</TableCell>
+                                          <TableCell className="text-right border-l font-black text-teal-700 bg-teal-50/50 dark:bg-teal-900/20 shadow-inner">₹{data.netWages.toLocaleString()}</TableCell>
                                         </>
                                       )}
                                     </TableRow>

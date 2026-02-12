@@ -301,14 +301,14 @@ export default function AttendanceReportPage() {
           className="flex flex-col md:flex-row md:items-center md:justify-between gap-4"
         >
           <div>
-            <h1 className="text-2xl font-bold text-slate-900 dark:text-white" data-testid="text-page-title">Unit-wise Attendance Reports</h1>
-            <p className="text-slate-500 mt-1">Hierarchical analysis: Unit &gt; Department &gt; Employee</p>
+            <h1 className="text-3xl font-black tracking-tight text-slate-900 dark:text-white" data-testid="text-page-title">Attendance Intelligence</h1>
+            <p className="text-slate-500 font-medium">Deep analysis of workforce presence and patterns</p>
           </div>
           <div className="flex gap-2 flex-wrap items-end">
             <div className="flex flex-col gap-1">
-              <label className="text-[10px] font-bold uppercase text-slate-400 ml-1">Period</label>
+              <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Period</label>
               <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
-                <SelectTrigger className="w-32 h-9">
+                <SelectTrigger className="w-32 h-9 font-bold shadow-sm">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -320,45 +320,70 @@ export default function AttendanceReportPage() {
               </Select>
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-[10px] font-bold uppercase text-slate-400 ml-1">Selection</label>
+              <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Selection</label>
               {selectedPeriod === 'month' ? (
                 <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-                  <SelectTrigger className="w-40 h-9" data-testid="select-month">
-                    <Calendar className="h-4 w-4 mr-2" />
+                  <SelectTrigger className="w-40 h-9 font-bold shadow-sm" data-testid="select-month">
+                    <Calendar className="h-4 w-4 mr-2 text-teal-600" />
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="January 2026">Jan 2026</SelectItem>
-                    <SelectItem value="February 2026">Feb 2026</SelectItem>
-                    <SelectItem value="March 2026">Mar 2026</SelectItem>
+                    {["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"].map(m => (
+                      <SelectItem key={m} value={`${m} 2026`}>{m} 2026</SelectItem>
+                    ))}
                     <SelectItem value="December 2025">Dec 2025</SelectItem>
                   </SelectContent>
                 </Select>
+              ) : selectedPeriod === 'week' ? (
+                 <Input
+                  type="week"
+                  value={selectedDate ? (() => {
+                    const d = new Date(selectedDate);
+                    const year = d.getFullYear();
+                    const oneJan = new Date(year, 0, 1);
+                    const numberOfDays = Math.floor((d.getTime() - oneJan.getTime()) / (24 * 60 * 60 * 1000));
+                    const result = Math.ceil((d.getDay() + 1 + numberOfDays) / 7);
+                    return `${year}-W${String(result).padStart(2, '0')}`;
+                  })() : ""}
+                  onChange={(e) => {
+                    if (!e.target.value) return;
+                    const [year, week] = e.target.value.split('-W');
+                    const d = new Date(parseInt(year), 0, 1);
+                    d.setDate(d.getDate() + (parseInt(week) - 1) * 7);
+                    setSelectedDate(d.toISOString().split('T')[0]);
+                  }}
+                  className="h-9 w-40 font-bold shadow-sm"
+                />
               ) : (
                 <Input
                   type={selectedPeriod === 'year' ? 'number' : 'date'}
                   value={selectedPeriod === 'year' ? new Date(selectedDate).getFullYear() : selectedDate}
+                  min={selectedPeriod === 'year' ? 2000 : undefined}
+                  max={selectedPeriod === 'year' ? 2100 : undefined}
                   onChange={(e) => {
                     if (selectedPeriod === 'year') {
-                      const d = new Date(selectedDate);
-                      d.setFullYear(parseInt(e.target.value));
-                      setSelectedDate(d.toISOString().split('T')[0]);
+                      const val = parseInt(e.target.value);
+                      if (val > 1900 && val < 2100) {
+                        const d = new Date(selectedDate);
+                        d.setFullYear(val);
+                        setSelectedDate(d.toISOString().split('T')[0]);
+                      }
                     } else {
                       setSelectedDate(e.target.value);
                     }
                   }}
-                  className="h-9 w-40"
+                  className="h-9 w-40 font-bold shadow-sm"
                 />
               )}
             </div>
             <div className="flex bg-slate-100 dark:bg-slate-900 rounded-lg p-1 border border-slate-200 dark:border-slate-800 h-9">
-              <Button variant="ghost" size="sm" className="h-7 text-xs gap-1 hover-elevate px-2" onClick={handleExportPDF}>
+              <Button variant="ghost" size="sm" className="h-7 text-xs gap-1 hover-elevate px-2 font-bold" onClick={handleExportPDF}>
                 <FileDown className="h-3 w-3" /> PDF
               </Button>
-              <Button variant="ghost" size="sm" className="h-7 text-xs gap-1 hover-elevate px-2" onClick={handleExportExcel}>
+              <Button variant="ghost" size="sm" className="h-7 text-xs gap-1 hover-elevate px-2 font-bold" onClick={handleExportExcel}>
                 <FileSpreadsheet className="h-3 w-3" /> Excel
               </Button>
-              <Button variant="ghost" size="sm" className="h-7 text-xs gap-1 hover-elevate px-2" onClick={handleExportText}>
+              <Button variant="ghost" size="sm" className="h-7 text-xs gap-1 hover-elevate px-2 font-bold" onClick={handleExportText}>
                 <FileText className="h-3 w-3" /> Text
               </Button>
             </div>

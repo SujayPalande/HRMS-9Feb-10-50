@@ -65,6 +65,8 @@ export interface IStorage {
   updateLeaveRequest(id: number, leaveRequest: Partial<LeaveRequest>): Promise<LeaveRequest | undefined>;
   deleteLeaveRequest(id: number): Promise<boolean>;
   
+  getSystemSettings(): Promise<any>;
+
   // Holiday methods
   getHoliday(id: number): Promise<Holiday | undefined>;
   getHolidays(): Promise<Holiday[]>;
@@ -420,6 +422,18 @@ export class MemStorage implements IStorage {
       this.currentUserId = user.id + 1;
     }
     return user;
+  }
+
+  async getSystemSettings(): Promise<any> {
+    return {
+      salaryComponents: {
+        basicSalaryPercentage: 50,
+        hraPercentage: 50,
+        epfPercentage: 12,
+        esicPercentage: 0.75,
+        professionalTax: 200
+      }
+    };
   }
 
   async getUnits(): Promise<Unit[]> {

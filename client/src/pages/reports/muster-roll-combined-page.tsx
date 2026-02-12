@@ -9,6 +9,7 @@ import { Download, Printer, FileSpreadsheet, Upload, FileText, ClipboardList, Bo
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
+import { useToast } from "@/hooks/use-toast";
 import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -52,6 +53,7 @@ type FormType = "form-ii" | "form-20";
 
 export default function MusterRollCombinedPage() {
   const currentDate = new Date();
+  const { toast } = useToast();
   const [activeForm, setActiveForm] = useState<FormType>("form-ii");
   const [selectedMonth, setSelectedMonth] = useState(currentDate.getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState(currentDate.getFullYear());
