@@ -25,7 +25,9 @@ interface ComplianceItem {
 }
 
 export default function ComplianceReportsPage() {
-  const [selectedYear, setSelectedYear] = useState("2023-24");
+  const currentYearValue = new Date().getFullYear();
+  const yearsList = Array.from({ length: 10 }, (_, i) => `${currentYearValue - 5 + i}-${(currentYearValue - 4 + i).toString().slice(-2)}`);
+  const [selectedYear, setSelectedYear] = useState(yearsList[5]);
   const [searchQuery, setSearchQuery] = useState("");
   const [showViewDialog, setShowViewDialog] = useState(false);
   const [selectedItem, setSelectedItem] = useState<ComplianceItem | null>(null);
@@ -146,17 +148,17 @@ export default function ComplianceReportsPage() {
           </div>
           <div className="flex gap-2 flex-wrap">
             <Select value={selectedYear} onValueChange={setSelectedYear}>
-              <SelectTrigger className="w-28" data-testid="select-year">
-                <Calendar className="h-4 w-4 mr-2" />
+              <SelectTrigger className="w-32 h-9 font-bold shadow-sm" data-testid="select-year">
+                <Calendar className="h-4 w-4 mr-2 text-teal-600" />
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="2023-24">2023-24</SelectItem>
-                <SelectItem value="2022-23">2022-23</SelectItem>
-                <SelectItem value="2021-22">2021-22</SelectItem>
+                {yearsList.map(y => (
+                  <SelectItem key={y} value={y}>{y}</SelectItem>
+                ))}
               </SelectContent>
             </Select>
-            <Button variant="outline" className="gap-2" onClick={handleExportPDF} data-testid="button-export">
+            <Button variant="outline" className="gap-2 h-9 font-bold shadow-sm" onClick={handleExportPDF} data-testid="button-export">
               <Download className="h-4 w-4" />
               Export PDF
             </Button>

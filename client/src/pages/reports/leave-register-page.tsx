@@ -61,6 +61,10 @@ export default function LeaveRegisterPage() {
   const [selectedDepartment, setSelectedDepartment] = useState<string>("all");
   const [factoryName, setFactoryName] = useState("ASN HR Consultancy & Services");
 
+  const monthsList = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+  const currentYear = new Date().getFullYear();
+  const yearsList = Array.from({ length: 10 }, (_, i) => currentYear - 5 + i);
+
   const { data: employees = [] } = useQuery<Employee[]>({
     queryKey: ["/api/employees"],
   });
@@ -488,11 +492,12 @@ export default function LeaveRegisterPage() {
               <div className="space-y-2">
                 <Label>Financial Year</Label>
                 <Select value={String(selectedYear)} onValueChange={(v) => setSelectedYear(Number(v))}>
-                  <SelectTrigger data-testid="select-year">
+                  <SelectTrigger data-testid="select-year" className="h-9 font-bold shadow-sm">
+                    <Calendar className="h-4 w-4 mr-2 text-teal-600" />
                     <SelectValue placeholder="Select Year" />
                   </SelectTrigger>
                   <SelectContent>
-                    {years.map((y) => (
+                    {yearsList.map((y) => (
                       <SelectItem key={y} value={String(y)}>{y}-{y + 1}</SelectItem>
                     ))}
                   </SelectContent>
