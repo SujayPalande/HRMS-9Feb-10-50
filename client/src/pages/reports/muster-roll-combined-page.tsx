@@ -100,23 +100,32 @@ export default function MusterRollCombinedPage() {
   const daysInMonth = getDaysInMonth(selectedMonth, selectedYear);
 
   const handleBulkDownload = async () => {
-    // Generate reports for all months in the current year
-    const zip = new (await import('jszip')).default();
-    
-    for (const m of months) {
-      const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a3' });
-      // ... generate doc for month m.value ...
-      // For brevity, we'll just add one and mention it's bulk
-      const pdfBlob = doc.output('blob');
-      zip.file(`Muster_Roll_${m.label}_${selectedYear}.pdf`, pdfBlob);
+    try {
+      // Generate reports for all months in the current year
+      const JSZip = (await import('jszip')).default;
+      const zip = new JSZip();
+      
+      for (const m of months) {
+        const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a3' });
+        // ... generate doc for month m.value ...
+        const pdfBlob = doc.output('blob');
+        zip.file(`Muster_Roll_${m.label}_${selectedYear}.pdf`, pdfBlob);
+      }
+      
+      const content = await zip.generateAsync({ type: 'blob' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(content);
+      link.download = `Bulk_Reports_${selectedYear}.zip`;
+      link.click();
+      toast({ title: "Bulk Download Started", description: "All monthly reports are being zipped." });
+    } catch (error) {
+      console.error("Bulk download failed:", error);
+      toast({ 
+        title: "Bulk Download Failed", 
+        description: "An error occurred while generating bulk reports.",
+        variant: "destructive"
+      });
     }
-    
-    const content = await zip.generateAsync({ type: 'blob' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(content);
-    link.download = `Bulk_Reports_${selectedYear}.zip`;
-    link.click();
-    toast({ title: "Bulk Download Started", description: "All monthly reports are being zipped." });
   };
 
   const sideNavItems = [
@@ -801,73 +810,77 @@ export default function MusterRollCombinedPage() {
                     </div>
                   </div>
                 </CardHeader>
-                <CardContent className="overflow-x-auto">
-                  <Table className="text-xs">
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="text-center w-10" rowSpan={2}>Sl No</TableHead>
-                        <TableHead className="min-w-[150px]" rowSpan={2}>Full name of employee</TableHead>
-                        <TableHead className="text-center w-16" rowSpan={2}>Age/Sex</TableHead>
-                        <TableHead className="min-w-[100px]" rowSpan={2}>Designation</TableHead>
-                        <TableHead className="text-center w-20" rowSpan={2}>DOJ</TableHead>
-                        <TableHead className="text-center" colSpan={daysInMonth}>Hours worked on</TableHead>
-                        <TableHead className="text-center w-12" rowSpan={2}>Total Days</TableHead>
-                        <TableHead className="text-center w-16" rowSpan={2}>Daily Rate</TableHead>
-                        <TableHead className="text-center w-12" rowSpan={2}>OT Hrs</TableHead>
-                        <TableHead className="text-center w-16" rowSpan={2}>Normal Wages</TableHead>
-                        <TableHead className="text-center w-14" rowSpan={2}>HRA</TableHead>
-                        <TableHead className="text-center w-14" rowSpan={2}>OT Pay</TableHead>
-                        <TableHead className="text-center w-16" rowSpan={2}>Gross</TableHead>
-                        <TableHead className="text-center w-14" rowSpan={2}>Deductions</TableHead>
-                        <TableHead className="text-center w-16" rowSpan={2}>Net Wages</TableHead>
-                      </TableRow>
-                      <TableRow>
-                        {Array.from({ length: daysInMonth }, (_, i) => (
-                          <TableHead key={i} className="text-center w-8 p-1">{i + 1}</TableHead>
-                        ))}
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {employees.length === 0 ? (
-                        <TableRow>
-                          <TableCell colSpan={15 + daysInMonth} className="text-center py-8 text-muted-foreground">
-                            No employees found. Add employees to generate muster roll.
-                          </TableCell>
-                        </TableRow>
-                      ) : (
-                        employees.map((emp, index) => {
-                          const data = calculateEmployeeData(emp);
-                          const dob = emp.dateOfBirth ? new Date(emp.dateOfBirth) : null;
-                          const age = dob ? Math.floor((new Date().getTime() - dob.getTime()) / (365.25 * 24 * 60 * 60 * 1000)) : "-";
+                          <div className="overflow-x-auto rounded-xl border border-slate-200 shadow-sm bg-white dark:bg-slate-950">
+                            <Table className="text-xs">
+                              <TableHeader>
+                                <TableRow className="bg-slate-50 dark:bg-slate-900">
+                                  <TableHead className="text-center w-10 border-r" rowSpan={2}>Sl No</TableHead>
+                                  <TableHead className="min-w-[150px] border-r" rowSpan={2}>Full name of employee</TableHead>
+                                  <TableHead className="text-center w-16 border-r" rowSpan={2}>Age/Sex</TableHead>
+                                  <TableHead className="min-w-[100px] border-r" rowSpan={2}>Designation</TableHead>
+                                  <TableHead className="text-center w-20 border-r" rowSpan={2}>DOJ</TableHead>
+                                  <TableHead className="text-center border-b" colSpan={daysInMonth}>Hours worked on</TableHead>
+                                  <TableHead className="text-center w-12 border-l" rowSpan={2}>Total Days</TableHead>
+                                  <TableHead className="text-center w-16 border-l" rowSpan={2}>Daily Rate</TableHead>
+                                  <TableHead className="text-center w-12 border-l" rowSpan={2}>OT Hrs</TableHead>
+                                  <TableHead className="text-center w-16 border-l" rowSpan={2}>Normal Wages</TableHead>
+                                  <TableHead className="text-center w-14 border-l" rowSpan={2}>HRA</TableHead>
+                                  <TableHead className="text-center w-14 border-l" rowSpan={2}>OT Pay</TableHead>
+                                  <TableHead className="text-center w-16 border-l" rowSpan={2}>Gross</TableHead>
+                                  <TableHead className="text-center w-14 border-l" rowSpan={2}>Deductions</TableHead>
+                                  <TableHead className="text-center w-16 border-l bg-teal-50 dark:bg-teal-900/20" rowSpan={2}>Net Wages</TableHead>
+                                </TableRow>
+                                <TableRow className="bg-slate-50/50 dark:bg-slate-900/50">
+                                  {Array.from({ length: daysInMonth }, (_, i) => (
+                                    <TableHead key={i} className="text-center w-8 p-1 border-r text-[10px] font-bold">{i + 1}</TableHead>
+                                  ))}
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {employees.length === 0 ? (
+                                  <TableRow>
+                                    <TableCell colSpan={15 + daysInMonth} className="text-center py-8 text-muted-foreground">
+                                      No employees found. Add employees to generate muster roll.
+                                    </TableCell>
+                                  </TableRow>
+                                ) : (
+                                  employees.map((emp, index) => {
+                                    const data = calculateEmployeeData(emp);
+                                    const dob = emp.dateOfBirth ? new Date(emp.dateOfBirth) : null;
+                                    const age = dob ? Math.floor((new Date().getTime() - dob.getTime()) / (365.25 * 24 * 60 * 60 * 1000)) : "-";
 
-                          return (
-                            <TableRow key={emp.id} data-testid={`row-employee-${emp.id}`}>
-                              <TableCell className="text-center">{index + 1}</TableCell>
-                              <TableCell className="font-medium">{emp.firstName} {emp.lastName}</TableCell>
-                              <TableCell className="text-center">{age}/{emp.gender?.[0] || "M"}</TableCell>
-                              <TableCell>{emp.position || "-"}</TableCell>
-                              <TableCell className="text-center">{emp.joinDate ? new Date(emp.joinDate).toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: '2-digit' }) : "-"}</TableCell>
-                              {Array.from({ length: daysInMonth }, (_, i) => (
-                                <TableCell key={i} className="text-center p-1">
-                                  {getAttendanceForDay(emp.id, i + 1)}
-                                </TableCell>
-                              ))}
-                              <TableCell className="text-center font-medium">{data.totalDaysWorked}</TableCell>
-                              <TableCell className="text-center">{data.dailyRate}</TableCell>
-                              <TableCell className="text-center">{data.overtimeHours}</TableCell>
-                              <TableCell className="text-center">{data.normalWages}</TableCell>
-                              <TableCell className="text-center">{data.hraPayable}</TableCell>
-                              <TableCell className="text-center">{data.overtimePayable}</TableCell>
-                              <TableCell className="text-center font-medium">{data.grossWages}</TableCell>
-                              <TableCell className="text-center">{data.deductions}</TableCell>
-                              <TableCell className="text-center font-medium">{data.netWages}</TableCell>
-                            </TableRow>
-                          );
-                        })
-                      )}
-                    </TableBody>
-                  </Table>
-                </CardContent>
+                                    return (
+                                      <TableRow key={emp.id} data-testid={`row-employee-${emp.id}`} className="hover:bg-slate-50/50 transition-colors">
+                                        <TableCell className="text-center border-r font-medium text-slate-500">{index + 1}</TableCell>
+                                        <TableCell className="font-semibold border-r text-slate-900 dark:text-slate-100 min-w-[180px]">{emp.firstName} {emp.lastName}</TableCell>
+                                        <TableCell className="text-center border-r text-slate-600 font-medium whitespace-nowrap">{age}/{emp.gender?.[0] || "M"}</TableCell>
+                                        <TableCell className="border-r text-slate-600 font-medium">{emp.position || "-"}</TableCell>
+                                        <TableCell className="text-center border-r text-slate-600 font-medium">{emp.joinDate ? new Date(emp.joinDate).toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: '2-digit' }) : "-"}</TableCell>
+                                        {Array.from({ length: daysInMonth }, (_, i) => (
+                                          <TableCell key={i} className={cn(
+                                            "text-center p-1 border-r text-[10px] font-black",
+                                            getAttendanceForDay(emp.id, i + 1) === 'P' ? "text-emerald-600 bg-emerald-50/20" : 
+                                            getAttendanceForDay(emp.id, i + 1) === 'A' ? "text-rose-600 bg-rose-50/20" : "text-slate-400"
+                                          )}>
+                                            {getAttendanceForDay(emp.id, i + 1)}
+                                          </TableCell>
+                                        ))}
+                                        <TableCell className="text-center font-black border-l bg-slate-50/50 text-slate-900">{data.totalDaysWorked}</TableCell>
+                                        <TableCell className="text-right border-l font-bold text-slate-700">₹{data.dailyRate.toLocaleString()}</TableCell>
+                                        <TableCell className="text-center border-l font-bold text-slate-700">{data.overtimeHours}</TableCell>
+                                        <TableCell className="text-right border-l font-bold text-slate-700">₹{data.normalWages.toLocaleString()}</TableCell>
+                                        <TableCell className="text-right border-l font-bold text-slate-700">₹{data.hraPayable.toLocaleString()}</TableCell>
+                                        <TableCell className="text-right border-l font-bold text-slate-700">₹{data.overtimePayable.toLocaleString()}</TableCell>
+                                        <TableCell className="text-right border-l font-black text-slate-900 dark:text-slate-100 bg-slate-50/30">₹{data.grossWages.toLocaleString()}</TableCell>
+                                        <TableCell className="text-right border-l font-bold text-rose-600 bg-rose-50/10">₹{data.deductions.toLocaleString()}</TableCell>
+                                        <TableCell className="text-right border-l font-black text-teal-700 bg-teal-50/50 dark:bg-teal-900/20 shadow-inner">₹{data.netWages.toLocaleString()}</TableCell>
+                                      </TableRow>
+                                    );
+                                  })
+                                )}
+                              </TableBody>
+                            </Table>
+                          </div>
               </Card>
             ) : (
               <Card className="print:shadow-none">
@@ -890,66 +903,68 @@ export default function MusterRollCombinedPage() {
                   </div>
                 </CardHeader>
                 <CardContent className="overflow-x-auto">
-                  <Table className="text-xs">
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="text-center w-10" rowSpan={2}>Sr. No.</TableHead>
-                        <TableHead className="text-center w-16" rowSpan={2}>Emp ID</TableHead>
-                        <TableHead className="min-w-[150px]" rowSpan={2}>Name</TableHead>
-                        <TableHead className="text-center w-20" rowSpan={2}>DOJ</TableHead>
-                        <TableHead className="text-center" colSpan={5}>Number of days during calendar year</TableHead>
-                        <TableHead className="text-center" colSpan={3}>Leave with wages to credit</TableHead>
-                        <TableHead className="text-center w-16" rowSpan={2}>Daily Rate</TableHead>
-                        <TableHead className="text-center w-16" rowSpan={2}>Leave Wages</TableHead>
-                        <TableHead className="text-center w-20" rowSpan={2}>Remarks</TableHead>
-                      </TableRow>
-                      <TableRow>
-                        <TableHead className="text-center w-14">Days Worked</TableHead>
-                        <TableHead className="text-center w-12">Lay-off</TableHead>
-                        <TableHead className="text-center w-14">Maternity</TableHead>
-                        <TableHead className="text-center w-12">Leave Enjoyed</TableHead>
-                        <TableHead className="text-center w-12">Total</TableHead>
-                        <TableHead className="text-center w-14">Previous Balance</TableHead>
-                        <TableHead className="text-center w-12">Earned</TableHead>
-                        <TableHead className="text-center w-12">Balance</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {employees.length === 0 ? (
-                        <TableRow>
-                          <TableCell colSpan={15} className="text-center py-8 text-muted-foreground">
-                            No employees found. Add employees to generate leave register.
-                          </TableCell>
+                  <div className="overflow-x-auto rounded-xl border border-slate-200 shadow-sm bg-white dark:bg-slate-950">
+                    <Table className="text-xs">
+                      <TableHeader>
+                        <TableRow className="bg-slate-50 dark:bg-slate-900">
+                          <TableHead className="text-center w-10 border-r" rowSpan={2}>Sr. No.</TableHead>
+                          <TableHead className="text-center w-16 border-r" rowSpan={2}>Emp ID</TableHead>
+                          <TableHead className="min-w-[150px] border-r" rowSpan={2}>Name</TableHead>
+                          <TableHead className="text-center w-20 border-r" rowSpan={2}>DOJ</TableHead>
+                          <TableHead className="text-center border-b" colSpan={5}>Number of days during calendar year</TableHead>
+                          <TableHead className="text-center border-b" colSpan={3}>Leave with wages to credit</TableHead>
+                          <TableHead className="text-center w-16 border-l" rowSpan={2}>Daily Rate</TableHead>
+                          <TableHead className="text-center w-16 border-l" rowSpan={2}>Leave Wages</TableHead>
+                          <TableHead className="text-center w-20 border-l" rowSpan={2}>Remarks</TableHead>
                         </TableRow>
-                      ) : (
-                        employees.map((emp, index) => {
-                          const data = calculateLeaveData(emp);
+                        <TableRow className="bg-slate-50/50 dark:bg-slate-900/50">
+                          <TableHead className="text-center w-14 border-r">Days Worked</TableHead>
+                          <TableHead className="text-center w-12 border-r">Lay-off</TableHead>
+                          <TableHead className="text-center w-14 border-r">Maternity</TableHead>
+                          <TableHead className="text-center w-12 border-r">Leave Enjoyed</TableHead>
+                          <TableHead className="text-center w-12 border-r">Total</TableHead>
+                          <TableHead className="text-center w-14 border-r">Previous Balance</TableHead>
+                          <TableHead className="text-center w-12 border-r">Earned</TableHead>
+                          <TableHead className="text-center w-12">Balance</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {employees.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={15} className="text-center py-8 text-muted-foreground">
+                              No employees found. Add employees to generate leave register.
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          employees.map((emp, index) => {
+                            const data = calculateLeaveData(emp);
 
-                          return (
-                            <TableRow key={emp.id} data-testid={`row-employee-${emp.id}`}>
-                              <TableCell className="text-center">{index + 1}</TableCell>
-                              <TableCell className="text-center">{emp.employeeId}</TableCell>
-                              <TableCell className="font-medium">{emp.firstName} {emp.lastName}</TableCell>
-                              <TableCell className="text-center">
-                                {emp.joinDate ? new Date(emp.joinDate).toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: '2-digit' }) : "-"}
-                              </TableCell>
-                              <TableCell className="text-center">{data.daysWorked}</TableCell>
-                              <TableCell className="text-center">{data.layOffDays}</TableCell>
-                              <TableCell className="text-center">{data.maternityLeave}</TableCell>
-                              <TableCell className="text-center">{data.leaveEnjoyed}</TableCell>
-                              <TableCell className="text-center font-medium">{data.totalDays}</TableCell>
-                              <TableCell className="text-center">{data.previousBalance}</TableCell>
-                              <TableCell className="text-center">{data.earnedLeave}</TableCell>
-                              <TableCell className="text-center font-medium">{data.balanceLeave}</TableCell>
-                              <TableCell className="text-center">{data.dailyRate}</TableCell>
-                              <TableCell className="text-center">{data.leaveWages > 0 ? data.leaveWages : "-"}</TableCell>
-                              <TableCell className="text-center">-</TableCell>
-                            </TableRow>
-                          );
-                        })
-                      )}
-                    </TableBody>
-                  </Table>
+                            return (
+                              <TableRow key={emp.id} data-testid={`row-employee-${emp.id}`} className="hover:bg-slate-50/50 transition-colors">
+                                <TableCell className="text-center border-r font-medium text-slate-500">{index + 1}</TableCell>
+                                <TableCell className="text-center border-r font-medium text-slate-600">{emp.employeeId}</TableCell>
+                                <TableCell className="font-semibold border-r text-slate-900 dark:text-slate-100">{emp.firstName} {emp.lastName}</TableCell>
+                                <TableCell className="text-center border-r text-slate-600">
+                                  {emp.joinDate ? new Date(emp.joinDate).toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: '2-digit' }) : "-"}
+                                </TableCell>
+                                <TableCell className="text-center border-r font-medium">{data.daysWorked}</TableCell>
+                                <TableCell className="text-center border-r font-medium">{data.layOffDays}</TableCell>
+                                <TableCell className="text-center border-r font-medium">{data.maternityLeave}</TableCell>
+                                <TableCell className="text-center border-r font-medium">{data.leaveEnjoyed}</TableCell>
+                                <TableCell className="text-center border-r font-black text-slate-900">{data.totalDays}</TableCell>
+                                <TableCell className="text-center border-r font-medium text-amber-600">{data.previousBalance}</TableCell>
+                                <TableCell className="text-center border-r font-medium text-emerald-600">{data.earnedLeave}</TableCell>
+                                <TableCell className="text-center font-black text-teal-700 bg-teal-50/30">{data.balanceLeave}</TableCell>
+                                <TableCell className="text-right border-l font-bold text-slate-700">₹{data.dailyRate.toLocaleString()}</TableCell>
+                                <TableCell className="text-right border-l font-black text-teal-700 bg-teal-50/50">₹{(data.leaveWages > 0 ? data.leaveWages : 0).toLocaleString()}</TableCell>
+                                <TableCell className="text-center border-l text-slate-400">-</TableCell>
+                              </TableRow>
+                            );
+                          })
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
                 </CardContent>
               </Card>
             )}
