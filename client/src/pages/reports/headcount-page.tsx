@@ -35,7 +35,7 @@ import { User, Department, Unit } from "@shared/schema";
 export default function HeadcountReportPage() {
   const [selectedPeriod, setSelectedPeriod] = useState("month");
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
-  const [selectedMonth, setSelectedMonth] = useState("January 2026");
+  const [selectedMonth, setSelectedMonth] = useState(`${new Date().toLocaleString('default', { month: 'long' })} ${new Date().getFullYear()}`);
   const [selectedUnit, setSelectedUnit] = useState("all");
   const [selectedDept, setSelectedDept] = useState("all");
   const [expandedEmployees, setExpandedEmployees] = useState<Set<number>>(new Set());
@@ -45,6 +45,10 @@ export default function HeadcountReportPage() {
   const { data: units = [] } = useQuery<Unit[]>({ queryKey: ["/api/masters/units"] });
   const { data: employees = [] } = useQuery<User[]>({ queryKey: ["/api/employees"] });
   const { data: departments = [] } = useQuery<Department[]>({ queryKey: ["/api/departments"] });
+
+  const monthsList = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+  const currentYear = new Date().getFullYear();
+  const yearsList = Array.from({ length: 10 }, (_, i) => currentYear - 5 + i);
 
   const getReportPeriod = () => {
     const date = new Date(selectedDate);
@@ -192,10 +196,9 @@ export default function HeadcountReportPage() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"].map(m => (
-                        <SelectItem key={m} value={`${m} 2026`}>{m} 2026</SelectItem>
+                      {monthsList.map(m => (
+                        <SelectItem key={m} value={`${m} ${selectedDate ? new Date(selectedDate).getFullYear() : currentYear}`}>{m} {selectedDate ? new Date(selectedDate).getFullYear() : currentYear}</SelectItem>
                       ))}
-                      <SelectItem value="December 2025">Dec 2025</SelectItem>
                     </SelectContent>
                   </Select>
                 ) : selectedPeriod === 'week' ? (
@@ -218,24 +221,27 @@ export default function HeadcountReportPage() {
                     }}
                     className="h-9 w-40 font-bold shadow-sm"
                   />
+                ) : selectedPeriod === 'year' ? (
+                  <Select value={String(new Date(selectedDate).getFullYear())} onValueChange={(v) => {
+                    const d = new Date(selectedDate);
+                    d.setFullYear(parseInt(v));
+                    setSelectedDate(d.toISOString().split('T')[0]);
+                  }}>
+                    <SelectTrigger className="w-40 h-9 font-bold shadow-sm">
+                      <Calendar className="h-4 w-4 mr-2 text-teal-600" />
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {yearsList.map(y => (
+                        <SelectItem key={y} value={String(y)}>{y}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 ) : (
                   <Input
-                    type={selectedPeriod === 'year' ? 'number' : 'date'}
-                    value={selectedPeriod === 'year' ? new Date(selectedDate).getFullYear() : selectedDate}
-                    min={selectedPeriod === 'year' ? 2000 : undefined}
-                    max={selectedPeriod === 'year' ? 2100 : undefined}
-                    onChange={(e) => {
-                      if (selectedPeriod === 'year') {
-                        const val = parseInt(e.target.value);
-                        if (val > 1900 && val < 2100) {
-                          const d = new Date(selectedDate);
-                          d.setFullYear(val);
-                          setSelectedDate(d.toISOString().split('T')[0]);
-                        }
-                      } else {
-                        setSelectedDate(e.target.value);
-                      }
-                    }}
+                    type="date"
+                    value={selectedDate}
+                    onChange={(e) => setSelectedDate(e.target.value)}
                     className="h-9 w-40 font-bold shadow-sm"
                   />
                 )}

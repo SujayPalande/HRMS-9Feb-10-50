@@ -1,3 +1,4 @@
+import { cn } from "@/lib/utils";
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -501,11 +502,13 @@ export default function MusterRollPage() {
                                       <TableCell className="font-semibold border-r text-slate-900 dark:text-slate-100 min-w-[180px]">{emp.firstName} {emp.lastName}</TableCell>
                                       <TableCell className="text-center border-r text-slate-600 font-medium whitespace-nowrap">{age}/{emp.gender?.[0] || "M"}</TableCell>
                                       <TableCell className="border-r text-slate-600 font-medium">{emp.position || "Worker"}</TableCell>
-                                      {Array.from({ length: (viewType === "muster" ? daysInMonth : 15) }, (_, i) => (
+                                      {Array.from({ length: (viewType === "muster" ? daysInMonth : daysInMonth) }, (_, i) => (
                                         <TableCell key={i} className={cn(
                                           "text-center p-1 border-r text-[10px] font-black",
                                           getAttendanceForDay(emp.id, i + 1) === 'P' ? "text-emerald-600 bg-emerald-50/20" : 
-                                          getAttendanceForDay(emp.id, i + 1) === 'A' ? "text-rose-600 bg-rose-50/20" : "text-slate-400"
+                                          getAttendanceForDay(emp.id, i + 1) === 'A' ? "text-rose-600 bg-rose-50/20" : 
+                                          getAttendanceForDay(emp.id, i + 1) === 'L' ? "text-amber-600 bg-amber-50/20" :
+                                          "text-slate-400"
                                         )}>
                                           {getAttendanceForDay(emp.id, i + 1)}
                                         </TableCell>
@@ -519,7 +522,7 @@ export default function MusterRollPage() {
                                           <TableCell className="text-right border-l font-bold text-amber-600 bg-amber-50/10">₹{data.esiDeduction.toLocaleString()}</TableCell>
                                           <TableCell className="text-right border-l font-black text-slate-900 dark:text-slate-100 bg-slate-50/30">₹{data.grossWages.toLocaleString()}</TableCell>
                                           <TableCell className="text-right border-l font-bold text-rose-600 bg-rose-50/10">₹{data.totalDeductions.toLocaleString()}</TableCell>
-                                          <TableCell className="text-right border-l font-black text-teal-700 bg-teal-50/50 dark:bg-teal-900/20 shadow-inner">₹{data.netWages.toLocaleString()}</TableCell>
+                                          <TableCell className="text-right border-l font-black text-teal-700 bg-teal-50/50 dark:bg-teal-900/20 shadow-inner">{data.netWages.toLocaleString()}</TableCell>
                                         </>
                                       )}
                                     </TableRow>

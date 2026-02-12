@@ -34,12 +34,16 @@ import { User, Department, Unit } from "@shared/schema";
 export default function PayrollReportPage() {
   const [selectedPeriod, setSelectedPeriod] = useState("month");
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
-  const [selectedMonth, setSelectedMonth] = useState("January 2026");
+  const [selectedMonth, setSelectedMonth] = useState(`${new Date().toLocaleString('default', { month: 'long' })} ${new Date().getFullYear()}`);
   const [selectedUnit, setSelectedUnit] = useState("all");
   const [selectedDept, setSelectedDept] = useState("all");
   const [expandedEmployees, setExpandedEmployees] = useState<Set<number>>(new Set());
   const [searchQuery, setSearchQuery] = useState("");
   const { toast } = useToast();
+
+  const monthsList = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+  const currentYear = new Date().getFullYear();
+  const yearsList = Array.from({ length: 10 }, (_, i) => currentYear - 5 + i);
 
   const { data: units = [] } = useQuery<Unit[]>({ queryKey: ["/api/masters/units"] });
   const { data: employees = [] } = useQuery<User[]>({ queryKey: ["/api/employees"] });
@@ -227,34 +231,61 @@ export default function PayrollReportPage() {
               </Select>
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-[10px] font-bold uppercase text-slate-400 ml-1">Selection</label>
+              <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Selection</label>
               {selectedPeriod === 'month' ? (
                 <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-                  <SelectTrigger className="w-40 h-9">
-                    <Calendar className="h-4 w-4 mr-2" />
+                  <SelectTrigger className="w-40 h-9 font-bold shadow-sm" data-testid="select-month">
+                    <Calendar className="h-4 w-4 mr-2 text-teal-600" />
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="January 2026">Jan 2026</SelectItem>
-                    <SelectItem value="February 2026">Feb 2026</SelectItem>
-                    <SelectItem value="March 2026">Mar 2026</SelectItem>
-                    <SelectItem value="December 2025">Dec 2025</SelectItem>
+                    {monthsList.map(m => (
+                      <SelectItem key={m} value={`${m} ${selectedDate ? new Date(selectedDate).getFullYear() : currentYear}`}>{m} {selectedDate ? new Date(selectedDate).getFullYear() : currentYear}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : selectedPeriod === 'week' ? (
+                 <Input
+                  type="week"
+                  value={selectedDate ? (() => {
+                    const d = new Date(selectedDate);
+                    const year = d.getFullYear();
+                    const oneJan = new Date(year, 0, 1);
+                    const numberOfDays = Math.floor((d.getTime() - oneJan.getTime()) / (24 * 60 * 60 * 1000));
+                    const result = Math.ceil((d.getDay() + 1 + numberOfDays) / 7);
+                    return `${year}-W${String(result).padStart(2, '0')}`;
+                  })() : ""}
+                  onChange={(e) => {
+                    if (!e.target.value) return;
+                    const [year, week] = e.target.value.split('-W');
+                    const d = new Date(parseInt(year), 0, 1);
+                    d.setDate(d.getDate() + (parseInt(week) - 1) * 7);
+                    setSelectedDate(d.toISOString().split('T')[0]);
+                  }}
+                  className="h-9 w-40 font-bold shadow-sm"
+                />
+              ) : selectedPeriod === 'year' ? (
+                <Select value={String(new Date(selectedDate).getFullYear())} onValueChange={(v) => {
+                  const d = new Date(selectedDate);
+                  d.setFullYear(parseInt(v));
+                  setSelectedDate(d.toISOString().split('T')[0]);
+                }}>
+                  <SelectTrigger className="w-40 h-9 font-bold shadow-sm">
+                    <Calendar className="h-4 w-4 mr-2 text-teal-600" />
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {yearsList.map(y => (
+                      <SelectItem key={y} value={String(y)}>{y}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               ) : (
                 <Input
-                  type={selectedPeriod === 'year' ? 'number' : 'date'}
-                  value={selectedPeriod === 'year' ? new Date(selectedDate).getFullYear() : selectedDate}
-                  onChange={(e) => {
-                    if (selectedPeriod === 'year') {
-                      const d = new Date(selectedDate);
-                      d.setFullYear(parseInt(e.target.value));
-                      setSelectedDate(d.toISOString().split('T')[0]);
-                    } else {
-                      setSelectedDate(e.target.value);
-                    }
-                  }}
-                  className="h-9 w-40"
+                  type="date"
+                  value={selectedDate}
+                  onChange={(e) => setSelectedDate(e.target.value)}
+                  className="h-9 w-40 font-bold shadow-sm"
                 />
               )}
             </div>
