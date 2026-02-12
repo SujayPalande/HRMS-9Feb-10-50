@@ -28,6 +28,8 @@ import { addCompanyHeader, addWatermark, addHRSignature, addFooter, addDocumentD
 import { User, Department, Unit } from "@shared/schema";
 
 export default function AttendanceReportPage() {
+  const [selectedPeriod, setSelectedPeriod] = useState("month"); // day, week, month, year
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [selectedMonth, setSelectedMonth] = useState("January 2026");
   const [selectedUnit, setSelectedUnit] = useState("all");
   const [selectedDept, setSelectedDept] = useState("all");
@@ -47,17 +49,32 @@ export default function AttendanceReportPage() {
     setExpandedEmployees(newSet);
   };
 
-  const getMonthData = (monthYear: string) => {
-    const parts = monthYear.split(" ");
-    if (parts.length < 2) return { startDate: new Date(), endDate: new Date() };
-    const [monthName, year] = parts;
-    const monthIndex = new Date(`${monthName} 1, ${year}`).getMonth();
-    const startDate = new Date(parseInt(year), monthIndex, 1);
-    const endDate = new Date(parseInt(year), monthIndex + 1, 0);
+  const getReportPeriod = () => {
+    const date = new Date(selectedDate);
+    let startDate, endDate;
+
+    if (selectedPeriod === "day") {
+      startDate = new Date(date.setHours(0, 0, 0, 0));
+      endDate = new Date(date.setHours(23, 59, 59, 999));
+    } else if (selectedPeriod === "week") {
+      const day = date.getDay();
+      const diff = date.getDate() - day + (day === 0 ? -6 : 1);
+      startDate = new Date(date.setDate(diff));
+      startDate.setHours(0, 0, 0, 0);
+      endDate = new Date(startDate);
+      endDate.setDate(startDate.getDate() + 6);
+      endDate.setHours(23, 59, 59, 999);
+    } else if (selectedPeriod === "month") {
+      startDate = new Date(date.getFullYear(), date.getMonth(), 1);
+      endDate = new Date(date.getFullYear(), date.getMonth() + 1, 0, 23, 59, 59, 999);
+    } else { // year
+      startDate = new Date(date.getFullYear(), 0, 1);
+      endDate = new Date(date.getFullYear(), 11, 31, 23, 59, 59, 999);
+    }
     return { startDate, endDate };
   };
 
-  const { startDate, endDate } = getMonthData(selectedMonth);
+  const { startDate, endDate } = getReportPeriod();
 
   const filteredEmployees = useMemo(() => {
     return employees.filter((emp: User) => {
@@ -104,7 +121,7 @@ export default function AttendanceReportPage() {
       addWatermark(doc);
       addCompanyHeader(doc, { 
         title: "UNIT-WISE ATTENDANCE REPORT", 
-        subtitle: `Period: ${selectedMonth} | Unit: ${selectedUnit === 'all' ? 'All Units' : units.find(u => u.id === parseInt(selectedUnit))?.name}` 
+        subtitle: `Period: ${selectedPeriod.toUpperCase()} (${startDate.toLocaleDateString()} - ${endDate.toLocaleDateString()}) | Unit: ${selectedUnit === 'all' ? 'All Units' : units.find(u => u.id === parseInt(selectedUnit))?.name}` 
       });
       
       const tableData = filteredEmployees.map(emp => {
@@ -287,20 +304,54 @@ export default function AttendanceReportPage() {
             <h1 className="text-2xl font-bold text-slate-900 dark:text-white" data-testid="text-page-title">Unit-wise Attendance Reports</h1>
             <p className="text-slate-500 mt-1">Hierarchical analysis: Unit &gt; Department &gt; Employee</p>
           </div>
-          <div className="flex gap-2 flex-wrap">
-            <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-              <SelectTrigger className="w-40 h-9" data-testid="select-month">
-                <Calendar className="h-4 w-4 mr-2" />
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="January 2026">Jan 2026</SelectItem>
-                <SelectItem value="February 2026">Feb 2026</SelectItem>
-                <SelectItem value="March 2026">Mar 2026</SelectItem>
-                <SelectItem value="December 2025">Dec 2025</SelectItem>
-              </SelectContent>
-            </Select>
-            <div className="flex bg-slate-100 dark:bg-slate-900 rounded-lg p-1 border border-slate-200 dark:border-slate-800">
+          <div className="flex gap-2 flex-wrap items-end">
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] font-bold uppercase text-slate-400 ml-1">Period</label>
+              <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
+                <SelectTrigger className="w-32 h-9">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="day">Day wise</SelectItem>
+                  <SelectItem value="week">Week wise</SelectItem>
+                  <SelectItem value="month">Month wise</SelectItem>
+                  <SelectItem value="year">Year wise</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] font-bold uppercase text-slate-400 ml-1">Selection</label>
+              {selectedPeriod === 'month' ? (
+                <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+                  <SelectTrigger className="w-40 h-9" data-testid="select-month">
+                    <Calendar className="h-4 w-4 mr-2" />
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="January 2026">Jan 2026</SelectItem>
+                    <SelectItem value="February 2026">Feb 2026</SelectItem>
+                    <SelectItem value="March 2026">Mar 2026</SelectItem>
+                    <SelectItem value="December 2025">Dec 2025</SelectItem>
+                  </SelectContent>
+                </Select>
+              ) : (
+                <Input
+                  type={selectedPeriod === 'year' ? 'number' : 'date'}
+                  value={selectedPeriod === 'year' ? new Date(selectedDate).getFullYear() : selectedDate}
+                  onChange={(e) => {
+                    if (selectedPeriod === 'year') {
+                      const d = new Date(selectedDate);
+                      d.setFullYear(parseInt(e.target.value));
+                      setSelectedDate(d.toISOString().split('T')[0]);
+                    } else {
+                      setSelectedDate(e.target.value);
+                    }
+                  }}
+                  className="h-9 w-40"
+                />
+              )}
+            </div>
+            <div className="flex bg-slate-100 dark:bg-slate-900 rounded-lg p-1 border border-slate-200 dark:border-slate-800 h-9">
               <Button variant="ghost" size="sm" className="h-7 text-xs gap-1 hover-elevate px-2" onClick={handleExportPDF}>
                 <FileDown className="h-3 w-3" /> PDF
               </Button>
