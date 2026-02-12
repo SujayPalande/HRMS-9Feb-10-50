@@ -462,30 +462,25 @@ export default function MusterRollPage() {
                               <TableHeader>
                                 <TableRow className="bg-slate-50 dark:bg-slate-900">
                                   <TableHead className="text-center w-10 border-r" rowSpan={2}>Sl No</TableHead>
-                                  <TableHead className="min-w-[150px] border-r" rowSpan={2}>Full name of employee</TableHead>
+                                  <TableHead className="min-w-[180px] border-r" rowSpan={2}>Full name of employee</TableHead>
                                   <TableHead className="text-center w-16 border-r" rowSpan={2}>Age/Sex</TableHead>
-                                  <TableHead className="min-w-[100px] border-r" rowSpan={2}>Designation</TableHead>
-                                  {viewType === "muster" ? (
+                                  <TableHead className="min-w-[120px] border-r" rowSpan={2}>Designation</TableHead>
+                                  <TableHead className="text-center border-b" colSpan={daysInMonth}>Attendance Details</TableHead>
+                                  <TableHead className="text-center w-12 border-l" rowSpan={2}>{viewType === "muster" ? "Total Days" : "Days"}</TableHead>
+                                  {viewType === "wage" && (
                                     <>
-                                      <TableHead className="text-center border-b" colSpan={daysInMonth}>Attendance Details</TableHead>
-                                      <TableHead className="text-center w-12 border-l" rowSpan={2}>Total Days</TableHead>
-                                    </>
-                                  ) : (
-                                    <>
-                                      <TableHead className="text-center border-b" colSpan={15}>Attendance (1-15)</TableHead>
-                                      <TableHead className="text-center w-12 border-l" rowSpan={2}>Days</TableHead>
-                                      <TableHead className="text-center w-20 border-l" rowSpan={2}>Basic Wages</TableHead>
-                                      <TableHead className="text-center w-16 border-l" rowSpan={2}>HRA</TableHead>
-                                      <TableHead className="text-center w-16 border-l" rowSpan={2}>PF</TableHead>
-                                      <TableHead className="text-center w-16 border-l" rowSpan={2}>ESI</TableHead>
-                                      <TableHead className="text-center w-20 border-l" rowSpan={2}>Gross</TableHead>
-                                      <TableHead className="text-center w-16 border-l" rowSpan={2}>Ded.</TableHead>
-                                      <TableHead className="text-center w-24 border-l bg-teal-50 dark:bg-teal-900/20" rowSpan={2}>Net Amount</TableHead>
+                                      <TableHead className="text-center w-24 border-l" rowSpan={2}>Basic Wages</TableHead>
+                                      <TableHead className="text-center w-20 border-l" rowSpan={2}>HRA</TableHead>
+                                      <TableHead className="text-center w-20 border-l" rowSpan={2}>PF</TableHead>
+                                      <TableHead className="text-center w-20 border-l" rowSpan={2}>ESI</TableHead>
+                                      <TableHead className="text-center w-24 border-l" rowSpan={2}>Gross</TableHead>
+                                      <TableHead className="text-center w-20 border-l" rowSpan={2}>Ded.</TableHead>
+                                      <TableHead className="text-center w-28 border-l bg-teal-50 dark:bg-teal-900/20" rowSpan={2}>Net Amount</TableHead>
                                     </>
                                   )}
                                 </TableRow>
                                 <TableRow className="bg-slate-50/50 dark:bg-slate-900/50">
-                                  {Array.from({ length: (viewType === "muster" ? daysInMonth : 15) }, (_, i) => (
+                                  {Array.from({ length: daysInMonth }, (_, i) => (
                                     <TableHead key={i} className="text-center w-8 p-1 border-r text-[10px] font-bold">{i + 1}</TableHead>
                                   ))}
                                 </TableRow>
@@ -502,7 +497,7 @@ export default function MusterRollPage() {
                                       <TableCell className="font-semibold border-r text-slate-900 dark:text-slate-100 min-w-[180px]">{emp.firstName} {emp.lastName}</TableCell>
                                       <TableCell className="text-center border-r text-slate-600 font-medium whitespace-nowrap">{age}/{emp.gender?.[0] || "M"}</TableCell>
                                       <TableCell className="border-r text-slate-600 font-medium">{emp.position || "Worker"}</TableCell>
-                                      {Array.from({ length: (viewType === "muster" ? daysInMonth : daysInMonth) }, (_, i) => (
+                                      {Array.from({ length: daysInMonth }, (_, i) => (
                                         <TableCell key={i} className={cn(
                                           "text-center p-1 border-r text-[10px] font-black",
                                           getAttendanceForDay(emp.id, i + 1) === 'P' ? "text-emerald-600 bg-emerald-50/20" : 
