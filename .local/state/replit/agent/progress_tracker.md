@@ -297,3 +297,6 @@
 [x] 297. Added unit and department filters to MLWF page - February 12, 2026
 [x] 298. Added unit and department filters to Statutory Compliance Combined page - February 12, 2026
 [x] 299. Added unit and department filters to Statutory Compliance (PF/ESI/Bonus) page - February 12, 2026
+[x] 300. Fixed missing Select imports on PF, ESI, PT, and MLWF pages - February 12, 2026
+[x] 301. Fixed filtering logic application on compliance sub-pages - February 12, 2026
+[x] 302. Added memoization dependencies for filters on compliance pages - February 12, 2026

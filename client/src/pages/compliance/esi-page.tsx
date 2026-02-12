@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Download, Upload, Building2, Users } from "lucide-react";
 import { motion } from "framer-motion";
 import { useState, useMemo } from "react";
@@ -18,6 +19,8 @@ export default function EsiPage() {
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [selectedUnit, setSelectedUnit] = useState<string>("all");
+  const [selectedDepartment, setSelectedDepartment] = useState<string>("all");
   const { toast } = useToast();
   
   const { data: employees = [] } = useQuery<User[]>({ queryKey: ["/api/employees"] });
@@ -27,6 +30,15 @@ export default function EsiPage() {
   const esiData = useMemo(() => {
     const data = employees
       .filter(emp => emp.isActive && emp.salary && emp.salary > 0)
+      .filter(emp => {
+        const dept = departments.find(d => d.id === emp.departmentId);
+        const unit = units.find(u => u.id === dept?.unitId);
+        
+        const matchesUnit = selectedUnit === "all" || unit?.id.toString() === selectedUnit;
+        const matchesDept = selectedDepartment === "all" || dept?.id.toString() === selectedDepartment;
+        
+        return matchesUnit && matchesDept;
+      })
       .map(emp => {
         const monthlyCTC = emp.salary!;
         const grossSalary = Math.round((monthlyCTC / 30) * 25);
@@ -55,7 +67,7 @@ export default function EsiPage() {
       hierarchical[item.unitName][item.departmentName].push(item);
     });
     return hierarchical;
-  }, [employees, departments, units]);
+  }, [employees, departments, units, selectedUnit, selectedDepartment]);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -131,6 +143,46 @@ export default function EsiPage() {
             <Button className="gap-2" onClick={generateReport}><Download className="h-4 w-4" />Generate Report</Button>
           </div>
         </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Filter Reports</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Unit</Label>
+                <Select value={selectedUnit} onValueChange={setSelectedUnit}>
+                  <SelectTrigger data-testid="select-unit">
+                    <SelectValue placeholder="All Units" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Units</SelectItem>
+                    {units.map((u) => (
+                      <SelectItem key={u.id} value={u.id.toString()}>{u.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Department</Label>
+                <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
+                  <SelectTrigger data-testid="select-department">
+                    <SelectValue placeholder="All Departments" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Departments</SelectItem>
+                    {departments
+                      .filter(d => selectedUnit === "all" || d.unitId?.toString() === selectedUnit)
+                      .map((d) => (
+                        <SelectItem key={d.id} value={d.id.toString()}>{d.name}</SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
         <Card>
           <CardHeader>

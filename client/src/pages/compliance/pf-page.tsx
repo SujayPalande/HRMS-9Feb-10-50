@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Calculator, Download, Upload, IndianRupee, Users, Building2, TrendingUp, CheckCircle, Shield } from "lucide-react";
 import { motion } from "framer-motion";
 import { useState, useMemo } from "react";
@@ -89,7 +90,7 @@ export default function PfPage() {
       hierarchical[item.unitName][item.departmentName].push(item);
     });
     return hierarchical;
-  }, [employees, salaryComponents, departments, units]);
+  }, [employees, salaryComponents, departments, units, selectedUnit, selectedDepartment]);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
