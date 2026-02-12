@@ -74,6 +74,8 @@ export default function StatutoryCompliancePage() {
   const { toast } = useToast();
   const [selectedMonth, setSelectedMonth] = useState(format(new Date(), 'yyyy-MM'));
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
+  const [selectedUnit, setSelectedUnit] = useState<string>("all");
+  const [selectedDepartment, setSelectedDepartment] = useState<string>("all");
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -162,6 +164,15 @@ export default function StatutoryCompliancePage() {
 
     return employees
       .filter(emp => emp.isActive && emp.pfApplicable !== false && emp.salary)
+      .filter(emp => {
+        const dept = departments.find(d => d.id === emp.departmentId);
+        const unit = units.find(u => u.id === dept?.unitId);
+        
+        const matchesUnit = selectedUnit === "all" || unit?.id.toString() === selectedUnit;
+        const matchesDept = selectedDepartment === "all" || dept?.id.toString() === selectedDepartment;
+        
+        return matchesUnit && matchesDept;
+      })
       .map(emp => {
         const payrollData = getPayrollForEmployee(emp.id, month, year);
         const workedDays = getWorkedDaysForMonth(emp.id, month, year);
@@ -209,6 +220,14 @@ export default function StatutoryCompliancePage() {
     return employees
       .filter(emp => emp.isActive && emp.esicApplicable !== false && emp.salary)
       .filter(emp => {
+        const dept = departments.find(d => d.id === emp.departmentId);
+        const unit = units.find(u => u.id === dept?.unitId);
+        
+        const matchesUnit = selectedUnit === "all" || unit?.id.toString() === selectedUnit;
+        const matchesDept = selectedDepartment === "all" || dept?.id.toString() === selectedDepartment;
+        
+        if (!(matchesUnit && matchesDept)) return false;
+
         const payrollData = getPayrollForEmployee(emp.id, month, year);
         if (payrollData) {
           const grossSalary = payrollData.basicSalary + (payrollData.hra || 0) + (payrollData.allowances || 0);
@@ -244,6 +263,15 @@ export default function StatutoryCompliancePage() {
     
     return employees
       .filter(emp => emp.isActive && emp.bonusApplicable !== false && emp.salary)
+      .filter(emp => {
+        const dept = departments.find(d => d.id === emp.departmentId);
+        const unit = units.find(u => u.id === dept?.unitId);
+        
+        const matchesUnit = selectedUnit === "all" || unit?.id.toString() === selectedUnit;
+        const matchesDept = selectedDepartment === "all" || dept?.id.toString() === selectedDepartment;
+        
+        return matchesUnit && matchesDept;
+      })
       .map((emp, index) => {
         const monthlyData = months.map((month, idx) => {
           const actualMonth = idx < 9 ? idx + 4 : idx - 8;
@@ -514,6 +542,8 @@ export default function StatutoryCompliancePage() {
 
   const years = Array.from({ length: 6 }, (_, i) => (new Date().getFullYear() - 2 + i).toString());
 
+  const { data: units = [] } = useQuery({ queryKey: ["/api/masters/units"] });
+
   return (
     <AppLayout>
       <div className="space-y-6">
@@ -530,7 +560,37 @@ export default function StatutoryCompliancePage() {
               Manage PF, ESI, and Bonus compliance - synced with payroll data
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-4">
+            <div className="flex items-center gap-2">
+              <Label>Unit</Label>
+              <Select value={selectedUnit} onValueChange={setSelectedUnit}>
+                <SelectTrigger className="w-40" data-testid="select-unit">
+                  <SelectValue placeholder="All Units" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Units</SelectItem>
+                  {units.map((u: any) => (
+                    <SelectItem key={u.id} value={u.id.toString()}>{u.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex items-center gap-2">
+              <Label>Dept</Label>
+              <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
+                <SelectTrigger className="w-40" data-testid="select-department">
+                  <SelectValue placeholder="All Departments" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Departments</SelectItem>
+                  {departments
+                    .filter(d => selectedUnit === "all" || d.unitId?.toString() === selectedUnit)
+                    .map((d) => (
+                      <SelectItem key={d.id} value={d.id.toString()}>{d.name}</SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            </div>
             <Select value={selectedMonth} onValueChange={setSelectedMonth}>
               <SelectTrigger className="w-40" data-testid="select-month">
                 <SelectValue placeholder="Select Month" />

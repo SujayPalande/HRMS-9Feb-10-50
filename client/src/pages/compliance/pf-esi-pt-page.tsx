@@ -20,6 +20,8 @@ export default function PfEsiPtPage() {
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [selectedUnit, setSelectedUnit] = useState<string>("all");
+  const [selectedDepartment, setSelectedDepartment] = useState<string>("all");
   const { toast } = useToast();
   
   const { data: departments = [] } = useQuery<Department[]>({ queryKey: ["/api/departments"] });
@@ -74,6 +76,15 @@ export default function PfEsiPtPage() {
   const pfHierarchical = useMemo(() => {
     const data = employees
       .filter(emp => emp.isActive && emp.salary && emp.salary > 0)
+      .filter(emp => {
+        const dept = departments.find(d => d.id === emp.departmentId);
+        const unit = units.find(u => u.id === dept?.unitId);
+        
+        const matchesUnit = selectedUnit === "all" || unit?.id.toString() === selectedUnit;
+        const matchesDept = selectedDepartment === "all" || dept?.id.toString() === selectedDepartment;
+        
+        return matchesUnit && matchesDept;
+      })
       .map(emp => {
         const salary = emp.salary!;
         const monthlyCTC = salary / 12;
@@ -101,6 +112,15 @@ export default function PfEsiPtPage() {
     const data = employees
       .filter(emp => {
         if (!emp.isActive || !emp.salary || emp.salary <= 0) return false;
+        
+        const dept = departments.find(d => d.id === emp.departmentId);
+        const unit = units.find(u => u.id === dept?.unitId);
+        
+        const matchesUnit = selectedUnit === "all" || unit?.id.toString() === selectedUnit;
+        const matchesDept = selectedDepartment === "all" || dept?.id.toString() === selectedDepartment;
+        
+        if (!(matchesUnit && matchesDept)) return false;
+
         const monthlySalary = emp.salary / 12;
         return monthlySalary <= 21000; 
       })
@@ -125,6 +145,15 @@ export default function PfEsiPtPage() {
   const ptHierarchical = useMemo(() => {
     const data = employees
       .filter(emp => emp.isActive && emp.salary && emp.salary > 0)
+      .filter(emp => {
+        const dept = departments.find(d => d.id === emp.departmentId);
+        const unit = units.find(u => u.id === dept?.unitId);
+        
+        const matchesUnit = selectedUnit === "all" || unit?.id.toString() === selectedUnit;
+        const matchesDept = selectedDepartment === "all" || dept?.id.toString() === selectedDepartment;
+        
+        return matchesUnit && matchesDept;
+      })
       .map(emp => {
         const salary = emp.salary!;
         const grossSalary = Math.round(salary / 12);
@@ -310,12 +339,42 @@ export default function PfEsiPtPage() {
             <h1 className="text-2xl font-bold text-slate-900" data-testid="text-page-title">PF / ESI / PT Management</h1>
             <p className="text-slate-500 mt-1">Manage statutory compliance and contributions</p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2 items-center">
+            <div className="flex items-center gap-2">
+              <Label className="whitespace-nowrap">Unit</Label>
+              <Select value={selectedUnit} onValueChange={setSelectedUnit}>
+                <SelectTrigger className="w-40" data-testid="select-unit">
+                  <SelectValue placeholder="All Units" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Units</SelectItem>
+                  {units.map((u) => (
+                    <SelectItem key={u.id} value={u.id.toString()}>{u.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex items-center gap-2">
+              <Label className="whitespace-nowrap">Dept</Label>
+              <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
+                <SelectTrigger className="w-40" data-testid="select-department">
+                  <SelectValue placeholder="All Departments" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Departments</SelectItem>
+                  {departments
+                    .filter(d => selectedUnit === "all" || d.unitId?.toString() === selectedUnit)
+                    .map((d) => (
+                      <SelectItem key={d.id} value={d.id.toString()}>{d.name}</SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            </div>
             <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
               <DialogTrigger asChild>
                 <Button variant="outline" className="gap-2" data-testid="button-upload-challan">
                   <Upload className="h-4 w-4" />
-                  Upload Challan
+                  Upload
                 </Button>
               </DialogTrigger>
               <DialogContent className="sm:max-w-md">
@@ -355,7 +414,7 @@ export default function PfEsiPtPage() {
             </Dialog>
             <Button className="gap-2" onClick={generateReport} data-testid="button-generate-report">
               <Download className="h-4 w-4" />
-              Generate Report
+              Report
             </Button>
           </div>
         </motion.div>

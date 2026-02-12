@@ -290,3 +290,10 @@
 [x] 290. Applied database schema (no changes detected - already up to date) - February 11, 2026
 [x] 291. Restarted workflow and verified application running successfully on port 5000 - February 11, 2026
 [x] 292. ALL MIGRATION TASKS COMPLETE: Application successfully running on port 5000 - February 11, 2026
+[x] 293. Added unit and department filters to Muster Roll page - February 12, 2026
+[x] 294. Added unit and department filters to Leave Register page - February 12, 2026
+[x] 295. Added unit and department filters to Provident Fund page - February 12, 2026
+[x] 296. Added unit and department filters to Professional Tax page - February 12, 2026
+[x] 297. Added unit and department filters to MLWF page - February 12, 2026
+[x] 298. Added unit and department filters to Statutory Compliance Combined page - February 12, 2026
+[x] 299. Added unit and department filters to Statutory Compliance (PF/ESI/Bonus) page - February 12, 2026

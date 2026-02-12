@@ -57,6 +57,8 @@ interface PayrollRecord {
 export default function LeaveRegisterPage() {
   const currentDate = new Date();
   const [selectedYear, setSelectedYear] = useState(currentDate.getFullYear());
+  const [selectedUnit, setSelectedUnit] = useState<string>("all");
+  const [selectedDepartment, setSelectedDepartment] = useState<string>("all");
   const [factoryName, setFactoryName] = useState("ASN HR Consultancy & Services");
 
   const { data: employees = [] } = useQuery<Employee[]>({
@@ -67,7 +69,15 @@ export default function LeaveRegisterPage() {
   const { data: units = [] } = useQuery<Unit[]>({ queryKey: ["/api/masters/units"] });
 
   const hierarchicalData = useMemo(() => {
-    const data = employees.map(emp => {
+    const data = employees.filter(emp => {
+      const dept = departments.find(d => d.id === emp.departmentId);
+      const unit = units.find(u => u.id === dept?.unitId);
+      
+      const matchesUnit = selectedUnit === "all" || unit?.id.toString() === selectedUnit;
+      const matchesDept = selectedDepartment === "all" || dept?.id.toString() === selectedDepartment;
+      
+      return matchesUnit && matchesDept;
+    }).map(emp => {
       const dept = departments.find(d => d.id === emp.departmentId);
       const unit = units.find(u => u.id === dept?.unitId);
       return {
@@ -436,7 +446,37 @@ export default function LeaveRegisterPage() {
             <CardTitle>Report Settings</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="space-y-2">
+                <Label>Unit</Label>
+                <Select value={selectedUnit} onValueChange={setSelectedUnit}>
+                  <SelectTrigger data-testid="select-unit">
+                    <SelectValue placeholder="All Units" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Units</SelectItem>
+                    {units.map((u) => (
+                      <SelectItem key={u.id} value={u.id.toString()}>{u.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Department</Label>
+                <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
+                  <SelectTrigger data-testid="select-department">
+                    <SelectValue placeholder="All Departments" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Departments</SelectItem>
+                    {departments
+                      .filter(d => selectedUnit === "all" || d.unitId?.toString() === selectedUnit)
+                      .map((d) => (
+                        <SelectItem key={d.id} value={d.id.toString()}>{d.name}</SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              </div>
               <div className="space-y-2">
                 <Label>Factory Name</Label>
                 <Input 
