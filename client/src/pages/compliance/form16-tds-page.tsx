@@ -24,7 +24,8 @@ import { addCompanyHeader, addWatermark, addHRSignature, addFooter, addDocumentD
 import { User, Department, Unit } from "@shared/schema";
 
 export default function Form16TdsPage() {
-  const [selectedYear, setSelectedYear] = useState("2023-24");
+  const [selectedPeriod, setSelectedPeriod] = useState("year");
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [searchQuery, setSearchQuery] = useState("");
   const [generatingAll, setGeneratingAll] = useState(false);
   const [generatingIndex, setGeneratingIndex] = useState<number | null>(null);
@@ -34,6 +35,34 @@ export default function Form16TdsPage() {
   const [selectedDept, setSelectedDept] = useState("all");
   const [statusMap, setStatusMap] = useState<Record<number, string>>({});
   const { toast } = useToast();
+
+  const getReportPeriod = () => {
+    const date = new Date(selectedDate);
+    let startDate, endDate;
+    if (selectedPeriod === "day") {
+      startDate = new Date(date.setHours(0, 0, 0, 0));
+      endDate = new Date(date.setHours(23, 59, 59, 999));
+    } else if (selectedPeriod === "week") {
+      const day = date.getDay();
+      const diff = date.getDate() - day + (day === 0 ? -6 : 1);
+      startDate = new Date(date.setDate(diff));
+      startDate.setHours(0, 0, 0, 0);
+      endDate = new Date(startDate);
+      endDate.setDate(startDate.getDate() + 6);
+      endDate.setHours(23, 59, 59, 999);
+    } else if (selectedPeriod === "month") {
+      startDate = new Date(date.getFullYear(), date.getMonth(), 1);
+      endDate = new Date(date.getFullYear(), date.getMonth() + 1, 0, 23, 59, 59, 999);
+    } else {
+      startDate = new Date(date.getFullYear(), 0, 1);
+      endDate = new Date(date.getFullYear(), 11, 31, 23, 59, 59, 999);
+    }
+    return { startDate, endDate };
+  };
+
+  const { startDate, endDate } = getReportPeriod();
+
+  const selectedYear = `${startDate.getFullYear()}-${(startDate.getFullYear() + 1).toString().slice(-2)}`;
 
   const { data: employees = [] } = useQuery<User[]>({ queryKey: ["/api/employees"] });
   const { data: departments = [] } = useQuery<Department[]>({ queryKey: ["/api/departments"] });
@@ -439,7 +468,38 @@ export default function Form16TdsPage() {
             <h1 className="text-2xl font-bold text-slate-900" data-testid="text-page-title">Form 16 & TDS Management</h1>
             <p className="text-slate-500 mt-1">Manage TDS deductions and Form 16 generation</p>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-2 items-end">
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] font-bold uppercase text-slate-400 ml-1">Period</label>
+              <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
+                <SelectTrigger className="w-32 h-9">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="day">Day wise</SelectItem>
+                  <SelectItem value="week">Week wise</SelectItem>
+                  <SelectItem value="month">Month wise</SelectItem>
+                  <SelectItem value="year">Year wise</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] font-bold uppercase text-slate-400 ml-1">Selection</label>
+              <Input
+                type={selectedPeriod === 'year' ? 'number' : 'date'}
+                value={selectedPeriod === 'year' ? new Date(selectedDate).getFullYear() : selectedDate}
+                onChange={(e) => {
+                  if (selectedPeriod === 'year') {
+                    const d = new Date(selectedDate);
+                    d.setFullYear(parseInt(e.target.value));
+                    setSelectedDate(d.toISOString().split('T')[0]);
+                  } else {
+                    setSelectedDate(e.target.value);
+                  }
+                }}
+                className="h-9 w-40"
+              />
+            </div>
             <div className="w-40">
               <Select value={selectedUnit} onValueChange={setSelectedUnit}>
                 <SelectTrigger data-testid="select-unit">
@@ -469,18 +529,6 @@ export default function Form16TdsPage() {
                 </SelectContent>
               </Select>
             </div>
-            <Select value={selectedYear} onValueChange={setSelectedYear}>
-              <SelectTrigger className="w-32" data-testid="select-year">
-                <Calendar className="h-4 w-4 mr-2" />
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="2025-26">2025-26</SelectItem>
-                <SelectItem value="2024-25">2024-25</SelectItem>
-                <SelectItem value="2023-24">2023-24</SelectItem>
-                <SelectItem value="2022-23">2022-23</SelectItem>
-              </SelectContent>
-            </Select>
             <Button 
               variant="outline"
               className="gap-2" 

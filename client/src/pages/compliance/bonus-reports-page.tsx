@@ -15,7 +15,35 @@ export default function BonusReportsPage() {
   const [selectedUnit, setSelectedUnit] = useState("all");
   const [selectedDept, setSelectedDept] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedPeriod, setSelectedPeriod] = useState("month");
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const { toast } = useToast();
+
+  const getReportPeriod = () => {
+    const date = new Date(selectedDate);
+    let startDate, endDate;
+    if (selectedPeriod === "day") {
+      startDate = new Date(date.setHours(0, 0, 0, 0));
+      endDate = new Date(date.setHours(23, 59, 59, 999));
+    } else if (selectedPeriod === "week") {
+      const day = date.getDay();
+      const diff = date.getDate() - day + (day === 0 ? -6 : 1);
+      startDate = new Date(date.setDate(diff));
+      startDate.setHours(0, 0, 0, 0);
+      endDate = new Date(startDate);
+      endDate.setDate(startDate.getDate() + 6);
+      endDate.setHours(23, 59, 59, 999);
+    } else if (selectedPeriod === "month") {
+      startDate = new Date(date.getFullYear(), date.getMonth(), 1);
+      endDate = new Date(date.getFullYear(), date.getMonth() + 1, 0, 23, 59, 59, 999);
+    } else {
+      startDate = new Date(date.getFullYear(), 0, 1);
+      endDate = new Date(date.getFullYear(), 11, 31, 23, 59, 59, 999);
+    }
+    return { startDate, endDate };
+  };
+
+  const { startDate, endDate } = getReportPeriod();
 
   const { data: units = [] } = useQuery<Unit[]>({ queryKey: ["/api/masters/units"] });
   const { data: departments = [] } = useQuery<Department[]>({ queryKey: ["/api/departments"] });
@@ -93,9 +121,42 @@ export default function BonusReportsPage() {
             <h1 className="text-2xl font-bold text-slate-900 dark:text-white" data-testid="text-page-title">Bonus Reports</h1>
             <p className="text-slate-500 mt-1">Generate and view employee bonus details</p>
           </div>
-          <Button className="gap-2" onClick={exportToExcel} data-testid="button-export-excel">
-            <FileSpreadsheet className="h-4 w-4" /> Export Excel
-          </Button>
+          <div className="flex gap-2 items-end flex-wrap">
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] font-bold uppercase text-slate-400 ml-1">Period</label>
+              <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
+                <SelectTrigger className="w-32 h-9">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="day">Day wise</SelectItem>
+                  <SelectItem value="week">Week wise</SelectItem>
+                  <SelectItem value="month">Month wise</SelectItem>
+                  <SelectItem value="year">Year wise</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] font-bold uppercase text-slate-400 ml-1">Selection</label>
+              <Input
+                type={selectedPeriod === 'year' ? 'number' : 'date'}
+                value={selectedPeriod === 'year' ? new Date(selectedDate).getFullYear() : selectedDate}
+                onChange={(e) => {
+                  if (selectedPeriod === 'year') {
+                    const d = new Date(selectedDate);
+                    d.setFullYear(parseInt(e.target.value));
+                    setSelectedDate(d.toISOString().split('T')[0]);
+                  } else {
+                    setSelectedDate(e.target.value);
+                  }
+                }}
+                className="h-9 w-40"
+              />
+            </div>
+            <Button className="gap-2" onClick={exportToExcel} data-testid="button-export-excel">
+              <FileSpreadsheet className="h-4 w-4" /> Export Excel
+            </Button>
+          </div>
         </motion.div>
 
         <div className="flex gap-4 mb-6">
